@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .status {
+    display: inline-block;
+    padding: 14px 28px;
+
+    font-family: "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 40px;
+    font-weight: 700;
+    color: #ffffff;
+
+    /* 背景 */
+    background: rgba(255, 105, 180, 0.75); /* ピンク系 */
+    border-radius: 999px; /* カプセル型 */
+
+    /* 影（文字＋背景） */
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.35),
+      0 0 18px rgba(255, 105, 180, 0.4);
+
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.6);
+
+    animation: softBlink 2.8s ease-in-out infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes softBlink {
+    0%   { opacity: 0.45; }
+    50%  { opacity: 1.0; }
+    100% { opacity: 0.45; }
+  }
+</style>
+</head>
+<body>
+  <div class="status">AI同士でおしゃべり中</div>
+</body>
+</html>

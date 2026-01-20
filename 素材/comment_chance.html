@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 12px 22px;
+
+    font-family: "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: #ffffff;
+
+    /* 背景（AI雑談中より少し落ち着いた色にして区別） */
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 999px;
+
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.35);
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.6);
+
+    white-space: nowrap;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+
+    /* 確率表示の強調（ピンク系） */
+    background: rgba(255, 105, 180, 0.75);
+    box-shadow: 0 0 16px rgba(255, 105, 180, 0.35);
+  }
+
+  .icon {
+    font-size: 30px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+  }
+</style>
+</head>
+<body>
+  <div class="badge">
+    <span class="icon">💬</span>
+    <span>コメント拾います</span>
+    <span class="pill">一定確率</span>
+  </div>
+</body>
+</html>

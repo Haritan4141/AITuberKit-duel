@@ -1,0 +1,67 @@
+.contents {
+    display: grid;
+    font-weight: bold;
+    text-align: center;
+    max-width: 200px;
+}
+
+.time {
+    display: flex;
+    font-size: 30px;
+    margin: 0 auto;
+    max-width: 200px;
+    padding: 10px 30px;
+    text-align: center;
+    border-radius: 12px;
+    /*
+    時間の背景色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    background: rgba(255, 255, 255, 1);
+    /*
+    時間の文字色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    color: rgba(0, 0, 0, 1);
+}
+
+.buttons {
+    padding: 0 30px;
+    display: flex;
+    cursor: pointer;
+    font-size: 17px;
+}
+
+.button {
+    width: 80px;
+    border-radius: 8px;
+    padding: 4px;
+    margin: 5px;
+    /*
+    マウスカーソルが重なっていない時のボタンの背景色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    background: rgba(255, 255, 255, 0);
+    /*
+    マウスカーソルが重なっていない時のボタンの文字色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    color: rgba(0, 0, 0, 0);
+}
+
+.button:hover{
+    /*
+    マウスカーソルが重なっている時のボタンの背景色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    background: rgba(255, 255, 255, 1);
+    /*
+    マウスカーソルが重なっている時のボタンの文字色
+    R, G, B 不透明度(0:透明 ~ 1:不透明)
+    */
+    color: rgba(0, 0, 0, 1);
+}
+
+#startOrStop {
+    padding-right: 5px;
+}

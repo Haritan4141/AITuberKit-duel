@@ -1,0 +1,51 @@
+.contents {
+    display: grid;
+    font-weight: bold;
+    text-align: center;
+    width: 250px;
+    color: rgb(255, 255, 255);
+}
+
+.time {
+    display: flex;
+    font-size: 30px;
+    margin: 0 auto;
+    width: 200px;
+    height: 53px;
+    padding: 10px 30px 0 30px;
+    text-align: center;
+    border-radius: 12px;
+    border-radius: 83% 75px / 80px 80%;
+    background-color: rgb(235, 103, 10);
+}
+
+.buttons {
+    padding: 0 30px;
+    display: flex;
+    cursor: pointer;
+    font-size: 17px;
+}
+
+.button {
+    width: 80px;
+    border-radius: 8px;
+    padding: 4px;
+    margin: 5px;
+    border-radius: 83% 75px / 80px 80%;
+    color: rgba(255, 255, 255, 0);
+    background-color: rgba(255, 163, 57, 0);
+}
+
+.start {
+    border-radius: 20% 70px / 28px 63%;
+}
+
+.button:hover{
+    color: rgba(255, 255, 255, 1);
+    background-color: rgba(255, 163, 57, 1);
+    box-shadow: 0 5px 15px 0 rgba(181, 86, 19, 0.5);
+}
+
+#startOrStop {
+    padding-right: 5px;
+}
