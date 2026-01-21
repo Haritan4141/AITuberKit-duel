@@ -6,6 +6,9 @@
 // ★ よく触る場所は「★」コメントを付けています。
 
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const OLLAMA_URL = "http://127.0.0.1:11434/v1/chat/completions";
 
@@ -250,6 +253,20 @@ const OBS_OVERLAY_PORT = 8787; // ★ 他とかぶるなら変える
 const OVERLAY_TITLE = "現在の話題";
 const OVERLAY_SHOW_META = true;     // ズラし度/生成元を表示
 
+const OVERLAY_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "overlay");
+
+function loadOverlayAsset(name) {
+  return fs.readFileSync(path.join(OVERLAY_DIR, name), "utf8");
+}
+
+function applyOverlayTemplate(s) {
+  return s
+    .replace(/__OVERLAY_TITLE__/g, OVERLAY_TITLE)
+    .replace(/__SHOW_META_STYLE__/g, OVERLAY_SHOW_META ? "" : "display:none;")
+    .replace(/__TOPIC_BRAIN_TEMP__/g, String(TOPIC_BRAIN_TEMP))
+    .replace(/__TOPIC_BRAIN_TEMP_FIXED__/g, TOPIC_BRAIN_TEMP.toFixed(2));
+}
+
 // =================================================
 // ★ キャラ設定（ここが一番よく触る）
 // =================================================
@@ -390,9 +407,6 @@ if (!STREAM_MODE) {
 // util
 // =================================================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-
-import fs from "node:fs"; // もし無ければ先頭に追加
 
 function appendJsonl(filePath, obj) {
   if (!filePath) return;
@@ -678,145 +692,9 @@ function setOverlayTopic({ topic, source, topicTemp, sessionNo, turn }) {
 function startObsOverlayServer() {
   if (!OBS_OVERLAY_ENABLED) return;
 
-  const overlayHtml = `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Topic Overlay</title>
-<style>
-  :root{
-    --bg: rgba(20, 18, 24, 0.55);
-    --fg: rgba(255,255,255,0.98);
-    --muted: rgba(255,255,255,0.75);
-    --accent: #ff5aa5;
-    --accent2: #56d6ff;
-  }
-  html,body{width:100%;height:100%;margin:0;background:transparent;overflow:hidden;font-family:system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif;}
-  .wrap{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;}
-  .card{min-width:760px;max-width:1200px;padding:18px 22px;border-radius:18px;background:var(--bg);box-shadow:0 10px 30px rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.10);backdrop-filter: blur(8px);-webkit-backdrop-filter: blur(8px);}
-
-  .row{display:flex;align-items:center;gap:14px;}
-  .badge{font-size:24px;font-weight:900;letter-spacing:.04em;color:rgba(255,255,255,0.98);padding:12px 22px;border-radius:999px;background:linear-gradient(90deg, rgba(255,90,165,.65), rgba(86,214,255,.65));border:1px solid rgba(255,255,255,.25);text-shadow:0 2px 4px rgba(0,0,0,.75),0 4px 10px rgba(0,0,0,.55),0 0 16px rgba(0,0,0,.45);box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.25);}
-
-  /* ★ topicが長くても崩れない */
-  .topicWrap{position:relative;display:block;flex: 1;min-width: 0;max-width: 80vw;overflow:hidden;border-radius:12px;padding:2px 0;}
-  .topicWrap.is-change::before{content:"";position:absolute;left:-14px;right:-14px;top:50%;height:1.25em;transform:translate(-25%, -50%);border-radius:999px;background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.24), rgba(255,255,255,.55), rgba(255,255,255,.24), rgba(255,255,255,0));filter:blur(1px);opacity:0;z-index:0;pointer-events:none;animation:sweep .55s ease-out;}
-
-  .topic{position:relative;z-index:1;font-size: clamp(28px, 3.2vw, 40px);font-weight:900;color:rgba(255,255,255,0.98);letter-spacing:.02em;text-shadow:0 2px 3px rgba(0,0,0,.85),0 6px 12px rgba(0,0,0,.65),0 12px 24px rgba(0,0,0,.45);filter: drop-shadow(0 2px 8px rgba(0,0,0,.4));white-space: normal;overflow-wrap: anywhere;line-height: 1.08;display: -webkit-box;-webkit-line-clamp: 2;-webkit-box-orient: vertical;overflow: hidden;}
-  .topic.is-change{animation:topicPop .4s ease-out;}
-
-  @keyframes sweep{0%{transform:translate(-25%, -50%);opacity:0;}15%{opacity:1;}100%{transform:translate(25%, -50%);opacity:0;}}
-  @keyframes topicPop{0%{transform:translateY(4px) scale(.98);filter:brightness(1.2);}100%{transform:none;filter:none;}}
-
-  .meta{margin-top:8px;display:flex;gap:14px;align-items:center;font-size:16px;color:var(--muted);}
-  .dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 18px rgba(255,90,165,.55);}
-  .kv{display:flex;gap:8px;align-items:center;}
-  .k{opacity:.85}.v{font-weight:700}
-
-  @keyframes flash{0%{transform:translateY(6px) scale(0.99);filter:saturate(1.35) brightness(1.10);}30%{transform:translateY(0px) scale(1.00);}100%{transform:translateY(0px) scale(1.00);filter:saturate(1.00) brightness(1.00);}}
-  .flash{animation:flash 900ms ease-out;}
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <div id="card" class="card">
-      <div class="row">
-        <div class="badge">${OVERLAY_TITLE}</div>
-        <div id="topicWrap" class="topicWrap">
-          <div id="topicText" class="topic">---</div>
-        </div>
-      </div>
-      <div class="meta" style="${OVERLAY_SHOW_META ? "" : "display:none;"}">
-        <div class="kv"><span class="dot" id="dot"></span><span class="k">Source</span><span class="v" id="src">INIT</span></div>
-        <div class="kv"><span class="k">ズラし度</span><span class="v" id="t">${TOPIC_BRAIN_TEMP.toFixed(2)}</span></div>
-        <div class="kv"><span class="k">#</span><span class="v" id="sess">0</span></div>
-        <div class="kv"><span class="k">turn</span><span class="v" id="turn">0</span></div>
-      </div>
-    </div>
-  </div>
-<script>
-  const card = document.getElementById('card');
-  const topicWrapEl = document.getElementById('topicWrap');
-  const topicTextEl = document.getElementById('topicText');
-  const srcEl = document.getElementById('src');
-  const tEl = document.getElementById('t');
-  const sessEl = document.getElementById('sess');
-  const turnEl = document.getElementById('turn');
-  const dotEl = document.getElementById('dot');
-  let lastUpdatedAt = 0;
-
-  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-  function calcAccent(temp){
-    const min = 0.55, max = 1.00;
-    const x = (clamp(temp, min, max) - min) / (max - min);
-    const hue = 190 - x * 110;
-    return 'hsl(' + hue + ' 82% 62%)';
-  }
-
-  function kickChangeAnim(){
-    topicWrapEl.classList.remove('is-change');
-    topicTextEl.classList.remove('is-change');
-    void topicWrapEl.offsetWidth;
-    topicWrapEl.classList.add('is-change');
-    topicTextEl.classList.add('is-change');
-    setTimeout(() => {
-      topicWrapEl.classList.remove('is-change');
-      topicTextEl.classList.remove('is-change');
-    }, 650);
-  }
-
-  function fitTopicFont() {
-    const wrap = topicWrapEl;
-    const el = topicTextEl;
-    el.style.fontSize = ''; // clampに戻す
-
-    let tries = 0;
-    while (tries < 6) {
-      const isOverflowing = el.scrollHeight > wrap.clientHeight + 4;
-      if (!isOverflowing) break;
-
-      const cs = getComputedStyle(el);
-      const cur = parseFloat(cs.fontSize);
-      el.style.fontSize = Math.max(22, cur - 2) + 'px';
-      tries++;
-    }
-  }
-
-  async function poll(){
-    try{
-      const r = await fetch('/topic', { cache: 'no-store' });
-      const s = await r.json();
-
-      const accent = calcAccent(s.topicTemp ?? ${TOPIC_BRAIN_TEMP});
-      dotEl.style.background = accent;
-      dotEl.style.boxShadow = '0 0 18px ' + accent + '77';
-      card.style.borderColor = accent + '33';
-
-      // 先にtopic反映（長文でも崩れない）
-      topicTextEl.textContent = s.topic || '---';
-      fitTopicFont();
-
-      srcEl.textContent = s.source || '---';
-      tEl.textContent = Number(s.topicTemp ?? 0).toFixed(2);
-      sessEl.textContent = String(s.sessionNo ?? 0);
-      turnEl.textContent = String(s.turn ?? 0);
-
-      if(s.updatedAt && s.updatedAt !== lastUpdatedAt){
-        lastUpdatedAt = s.updatedAt;
-        card.classList.remove('flash');
-        void card.offsetWidth;
-        card.classList.add('flash');
-        kickChangeAnim();
-      }
-
-    }catch(e){}
-    setTimeout(poll, 500);
-  }
-  poll();
-</script>
-</body>
-</html>`;
+  const overlayHtml = applyOverlayTemplate(loadOverlayAsset("overlay.html"));
+  const overlayCss = applyOverlayTemplate(loadOverlayAsset("overlay.css"));
+  const overlayJs = applyOverlayTemplate(loadOverlayAsset("overlay.js"));
 
   const server = http.createServer((req, res) => {
     try {
@@ -828,6 +706,24 @@ function startObsOverlayServer() {
           "Cache-Control": "no-store",
         });
         res.end(JSON.stringify(overlayState));
+        return;
+      }
+
+      if (url.pathname === "/overlay.css") {
+        res.writeHead(200, {
+          "Content-Type": "text/css; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(overlayCss);
+        return;
+      }
+
+      if (url.pathname === "/overlay.js") {
+        res.writeHead(200, {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(overlayJs);
         return;
       }
 
