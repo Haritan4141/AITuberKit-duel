@@ -5,13 +5,15 @@ echo ===============================
 echo  Starting AITuberKit
 echo ===============================
 
+set "ROOT=%~dp0"
+
 REM ---- Ollama ----
 start cmd /k ollama serve
 timeout /t 2
 
 REM ---- Speaker A ----
 start cmd /k ^
-  cd /d C:\AITuberKit\aituber-kit ^&^& ^
+  cd /d "%ROOT%aituber-kit" ^&^& ^
   set PORT=3000 ^&^& ^
   set NEXT_PUBLIC_MESSAGE_RECEIVER_ENABLED=true ^&^& ^
   set NEXT_PUBLIC_CLIENT_ID=speakerA ^&^& ^
@@ -21,7 +23,7 @@ timeout /t 2
 
 REM ---- Speaker B ----
 start cmd /k ^
-  cd /d C:\AITuberKit\aituber-kit-B ^&^& ^
+  cd /d "%ROOT%aituber-kit-B" ^&^& ^
   set PORT=3001 ^&^& ^
   set NEXT_PUBLIC_MESSAGE_RECEIVER_ENABLED=true ^&^& ^
   set NEXT_PUBLIC_CLIENT_ID=speakerB ^&^& ^

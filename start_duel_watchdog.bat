@@ -5,7 +5,7 @@ echo ===============================
 echo  Starting duel.mjs (watchdog)
 echo ===============================
 
-cd /d C:\Users\Haritan\Documents\AITuberKit
+cd /d "%~dp0"
 
 powershell -ExecutionPolicy Bypass -File run_duel_watchdog.ps1
 

@@ -3,7 +3,10 @@
 # =========================================
 
 $IntervalSec = 30 * 60           # ★テスト用：1分（本番は 30 * 60）
-$WorkDir     = "C:\Users\Haritan\Documents\AITuberKit"
+$WorkDir     = $PSScriptRoot
+if (-not $WorkDir) {
+  $WorkDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
 $ScriptName  = "duel.mjs"
 $NodePath    = "node.exe"       # node が PATH にある前提
 

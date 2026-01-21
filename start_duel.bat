@@ -5,7 +5,7 @@ echo ===============================
 echo  Starting duel.mjs
 echo ===============================
 
-cd /d C:\Users\Haritan\Documents\AITuberKit
+cd /d "%~dp0"
 
 node duel.mjs
 
