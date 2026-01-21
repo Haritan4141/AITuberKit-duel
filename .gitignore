@@ -1,4 +1,5 @@
 # Large binary assets
+.env
 VRM/
 インストーラー/
 node_modules/

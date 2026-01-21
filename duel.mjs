@@ -1,4 +1,4 @@
-// duel.mjs
+﻿// duel.mjs
 // ===== AITuberKit x2 + Ollama : 安定運用版 + Topic Brain + OBS演出連動 =====
 // 追加: しゃべった内容ログ / 感情・温度ログ / AI話題生成(Topic Brain) / 会話停止の自動再開
 // 追加: OBS用「話題テロップ」(色・SE・フェード) を自動表示（常時表示）
@@ -10,6 +10,28 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const raw = fs.readFileSync(filePath, "utf8");
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line || line.trim().startsWith("#")) continue;
+    const idx = line.indexOf("=");
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    let val = line.slice(idx + 1).trim();
+    if (!key) continue;
+    if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] == null || process.env[key] === "") {
+      process.env[key] = val;
+    }
+  }
+}
+
+const ENV_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), ".env");
+loadEnvFile(ENV_PATH);
+
 const OLLAMA_URL = "http://127.0.0.1:11434/v1/chat/completions";
 
 
@@ -18,7 +40,7 @@ const OLLAMA_URL = "http://127.0.0.1:11434/v1/chat/completions";
 // ================================
 const YT_API_KEY = process.env.YT_API_KEY; // ★必須
 const YT_API_BASE = "https://www.googleapis.com/youtube/v3";
-const YT_VIDEO_ID = "XXXXXXXXXXX";
+const YT_VIDEO_ID = process.env.YT_VIDEO_ID || "XXXXXXXXXXX";
 
 // ★微調整ポイント：YouTubeコメント取得のデバッグログ
 const YT_DEBUG = true;
@@ -282,7 +304,7 @@ const SPEAKER_A = {
   clientId: "speakerA",
 
   // ★ 使用するモデル（A/B同じでもOK）
-  ollamaModel: "gemma3:4b",
+  ollamaModel: "gemma3:12b",
 
   // ★ 性格差を出すための温度（低いほど安定 / 高いほど発散）
   temperature: 0.75,
@@ -297,7 +319,7 @@ const SPEAKER_B = {
   partnerName: "マヌカ",
   aituberBase: "http://localhost:3001",
   clientId: "speakerB",
-  ollamaModel: "gemma3:4b",
+  ollamaModel: "gemma3:12b",
 
   temperature: 0.55,
   emotion: "friendly",
