@@ -4,7 +4,8 @@ AITuberKit を 2系統起動して、Ollama で会話させるデュエル構成
 YouTube コメントの取り込みと、OBS 用の話題テロップも同梱しています。
 
 ## 必要なもの
-- Node.js / npm
+- Node.js: ^20.0.0
+- npm: ^10.0.0
 - Ollama (ローカルで `ollama serve` が動くこと)
 - Windows (同梱の .bat / .ps1 は Windows 向け)
 

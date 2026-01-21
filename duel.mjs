@@ -232,16 +232,34 @@ async function startYouTubeLiveChatPolling(videoId) {
 function stopYouTubeLiveChatPolling() {
   ytPollingAbort = true;
 }
-
 // last を作ったあとに「たまに」コメントに差し替える
-function maybeInjectLiveComment(defaultLine) {
+function maybeInjectLiveComment(defaultLine, overlayContext) {
   if (Math.random() >= COMMENT_INSERT_RATE) return defaultLine;
 
   const c = popLiveCommentDedup();
   if (!c) return defaultLine;
 
-  // ★微調整ポイント：コメント挿入の言い回し
-  return `[neutral]コメントで「${c}」って流れてたけど、どう思う？`;
+  // コメント挿入時にテロップも更新
+  if (overlayContext) {
+    setOverlayTopic({
+      topic: `コメント: ${c}`,
+      source: "Youtube Comment",
+      topicTemp: TOPIC_BRAIN_TEMP,
+      sessionNo: overlayContext.sessionNo,
+      turn: overlayContext.turn,
+    });
+  }
+
+  const templates = [
+    `[neutral]コメントで「${c}」って流れてたけど、どう思う？`,
+    `[neutral]今のコメントに「${c}」ってあったよ。どう感じた？`,
+    `[neutral]コメントで「${c}」見かけたんだけど、${c}ってどう？`,
+    `[neutral]視聴者コメントで「${c}」って来てたよ。どう答える？`,
+    `[neutral]コメントで${c}って話題が出てた。これどう思う？`,
+    `[neutral]今コメントで「${c}」って来てた。ちょっと触れてみる？`,
+  ];
+
+  return templates[Math.floor(Math.random() * templates.length)];
 }
 
 // =================================================
@@ -1208,7 +1226,7 @@ async function runConversation(sessionNo) {
         topicChangeLines[Math.floor(Math.random() * topicChangeLines.length)];
 
       last = `[neutral]${picked}`;
-      last = maybeInjectLiveComment(last); // ★ここ追加：たまにYouTubeコメントに差し替え
+      last = maybeInjectLiveComment(last, { sessionNo, turn: i }); // ★ここ追加：たまにYouTubeコメントに差し替え
       last = normalizeEmotionTagged(last, "neutral"); // ★話題転換でもタグ事故を潰す
 
       const ownerId = pickTopicOwner();
