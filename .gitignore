@@ -1,5 +1,5 @@
 # Large binary assets
 .env
-VRM/
+/VRM/
 インストーラー/
 node_modules/
