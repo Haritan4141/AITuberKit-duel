@@ -8,6 +8,7 @@ YouTube コメントの取り込みと、OBS 用の話題テロップも同梱�
 - npm: ^10.0.0
 - Ollama (ローカルで `ollama serve` が動くこと)
 - Windows (同梱の .bat / .ps1 は Windows 向け)
+- VOICEBOX（テキスト読み上げ用）
 
 ## セットアップ
 1) リポジトリを取得
@@ -22,7 +23,11 @@ cd .\aituber-kit
 npm install
 cd ..\aituber-kit-B
 npm install
-cd ..
+```
+
+2) LLMモデルのダウンロード（初期設定はgemma3:12b）
+```bat
+ollama pull gemma3:12b
 ```
 
 ## 起動手順
@@ -31,7 +36,19 @@ cd ..
 start_aituber.bat
 ```
 
-2) デュエルを開始
+2) AITuberKit(ブラウザ)の設定
+http://localhost:3000/
+http://localhost:3001/
+それぞれで
+左上歯車から その他 外部からの指示を受け付ける の状態をONにする
+Client ID をそれぞれ 「speakerA」 と 「speakerB」 に設定する
+用途によってVRMファイルの変更や背景の変更も可能です。
+
+3) VOICEBOXの起動
+VOICEBOXを起動してください
+※読み上げが不要の場合はスキップ
+
+4) デュエルを開始
 ```bat
 start_duel.bat
 ```
