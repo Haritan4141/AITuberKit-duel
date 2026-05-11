@@ -3,3 +3,12 @@
 /VRM/
 インストーラー/
 node_modules/
+
+# Next.js build output (kit を 2 プロセスで dev 起動するため A/B 別に出す)
+aituber-kit/.next/
+aituber-kit/.next-*/
+aituber-kit/logs/
+
+# Local logs
+duel_log.jsonl
+duel_events.jsonl

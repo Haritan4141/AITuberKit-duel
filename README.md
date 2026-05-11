@@ -21,9 +21,9 @@ cd AITuberKit
 ```bat
 cd .\aituber-kit
 npm install
-cd ..\aituber-kit-B
-npm install
 ```
+※ 本構成では `aituber-kit/` 1 つを 2 プロセス（PORT=3000 / 3001）で起動します。
+   それぞれの dev サーバーは `.next-A` / `.next-B` を `distDir` に使うので互いに衝突しません。
 
 2) LLMモデルのダウンロード（初期設定はgemma3:12b）
 ```bat
@@ -42,7 +42,9 @@ http://localhost:3001/
 それぞれで
 左上歯車から その他 外部からの指示を受け付ける の状態をONにする
 Client ID をそれぞれ 「speakerA」 と 「speakerB」 に設定する
-用途によってVRMファイルの変更や背景の変更も可能です。
+VRM ファイルや背景は **各ポートごと** にブラウザ側の設定で切り替えてください。
+ポート違い（3000 / 3001）は別オリジン扱いなので、localStorage は独立して保持されます。
+同梱 VRM: `aituber-kit/public/vrm/` （`Mafuyu_VRM.vrm` / `MANUKA.vrm`）
 
 3) VOICEBOXの起動
 VOICEBOXを起動してください
