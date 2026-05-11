@@ -1,0 +1,86 @@
+{
+  "ollama": {
+    "url": "http://127.0.0.1:11434/v1/chat/completions",
+    "fetchTimeoutMs": 60000
+  },
+  "speakers": {
+    "A": {
+      "id": "A",
+      "charName": "マヌカ",
+      "partnerName": "真冬",
+      "aituberBase": "http://localhost:3000",
+      "clientId": "speakerA",
+      "ollamaModel": "gemma3:12b",
+      "temperature": 0.75,
+      "emotion": "cheerful"
+    },
+    "B": {
+      "id": "B",
+      "charName": "真冬",
+      "partnerName": "マヌカ",
+      "aituberBase": "http://localhost:3001",
+      "clientId": "speakerB",
+      "ollamaModel": "gemma3:12b",
+      "temperature": 0.55,
+      "emotion": "friendly"
+    }
+  },
+  "conversation": {
+    "streamMode": true,
+    "turns": 20,
+    "maxChars": 220,
+    "callNameProb": 0.2,
+    "topicInterval": 3,
+    "historyKeepTurns": 8,
+    "baseWaitMs": 800,
+    "perCharMs": 170,
+    "maxWaitMs": 60000,
+    "stallMs": 45000,
+    "restartWaitMs": 2000,
+    "apiRetry": 3,
+    "apiRetryBaseMs": 500,
+    "maxRunMs": 600000
+  },
+  "topicBrain": {
+    "enabled": true,
+    "temperature": 0.75,
+    "maxChars": 28,
+    "lookback": 10,
+    "repeatAvoid": 2,
+    "turnLogMax": 60,
+    "usedTopicsMax": 40,
+    "fallbackTopics": [
+      "最近ハマっていること",
+      "最近見た動画や配信",
+      "好きな食べ物の話",
+      "ちょっとした日常の失敗談",
+      "最近気になっているゲームやアプリ",
+      "子どもの頃の思い出"
+    ],
+    "changeBy": {
+      "mode": "prob",
+      "aWeight": 0.5,
+      "bWeight": 0.5
+    }
+  },
+  "overlay": {
+    "enabled": true,
+    "port": 8787,
+    "title": "現在の話題",
+    "showMeta": true
+  },
+  "youtube": {
+    "videoId": "",
+    "debug": true,
+    "commentInsertRate": 1.0,
+    "commentMaxLen": 60,
+    "commentQueueMax": 10,
+    "pollIntervalMs": 60000,
+    "seenIdsMax": 2000
+  },
+  "log": {
+    "sayJsonl": "duel_log.jsonl",
+    "eventsJsonl": "duel_events.jsonl",
+    "enabled": true
+  }
+}
