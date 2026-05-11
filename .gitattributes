@@ -1,0 +1,12 @@
+# Windows shell scripts: 改行を必ず CRLF で保存
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# テキスト本文は LF で保存（cross-platform）
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
