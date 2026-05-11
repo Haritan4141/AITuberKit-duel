@@ -2,7 +2,7 @@
 # duel.mjs watchdog (30分ごとに再起動) + 演出
 # =========================================
 
-$IntervalSec = 30 * 60           # ★テスト用：1分（本番は 30 * 60）
+$IntervalSec = 30 * 60           # 再起動間隔。30分。テストするときは短くする（例: 60）。
 $WorkDir     = $PSScriptRoot
 if (-not $WorkDir) {
   $WorkDir = Split-Path -Parent $MyInvocation.MyCommand.Path
