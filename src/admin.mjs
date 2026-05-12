@@ -1,6 +1,7 @@
 // GUI 管理画面のための API ハンドラ
 // /api/status, /api/config (GET/POST), /api/skip-topic, /api/pause, /api/resume, /api/log/stream
 
+import fs from "node:fs";
 import { config, reloadConfig, writeConfigToDisk } from "./config.mjs";
 import { logEmitter, logLine } from "./log.mjs";
 import { getOverlayState } from "./overlay.mjs";
@@ -82,8 +83,17 @@ function handleStatus(req, res) {
 // /api/config GET / POST
 // =================================================
 function handleGetConfig(req, res) {
-  // Infinity は JSON シリアライズで null になる → クライアント側で streamMode を見て判定
-  sendJson(res, 200, config);
+  // ディスクの生 JSON を返す（Infinity 問題回避 + ユーザーが編集中の値を保つ）
+  try {
+    const raw = fs.readFileSync(config.paths.configPath, "utf8");
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    });
+    res.end(raw);
+  } catch (e) {
+    sendJson(res, 500, { error: e?.message ?? "read failed" });
+  }
 }
 
 async function handlePostConfig(req, res) {

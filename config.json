@@ -72,7 +72,7 @@
   "youtube": {
     "videoId": "",
     "debug": true,
-    "commentInsertRate": 1.0,
+    "commentInsertRate": 1,
     "commentMaxLen": 60,
     "commentQueueMax": 10,
     "pollIntervalMs": 60000,

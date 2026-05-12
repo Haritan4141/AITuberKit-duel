@@ -12,3 +12,6 @@ aituber-kit/logs/
 # Local logs
 duel_log.jsonl
 duel_events.jsonl
+
+# config.json のバックアップ（admin 保存時に作成される）
+config.json.bak

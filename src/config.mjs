@@ -64,8 +64,17 @@ export function reloadConfig() {
   return config;
 }
 
+// disk に永続化してはいけないキー（secrets / in-memory only）
+function stripSecretsAndDerived(cfg) {
+  delete cfg.paths;
+  if (cfg.youtube) {
+    // apiKey は .env (YT_API_KEY) のみ。disk には絶対に書かない（漏洩防止）。
+    delete cfg.youtube.apiKey;
+  }
+  return cfg;
+}
+
 export function writeConfigToDisk(newConfig) {
-  // バックアップを作る
   const bakPath = `${CONFIG_PATH}.bak`;
   try {
     fs.copyFileSync(CONFIG_PATH, bakPath);
@@ -76,9 +85,9 @@ export function writeConfigToDisk(newConfig) {
   const serializable = JSON.parse(JSON.stringify(newConfig, (_, v) =>
     v === Infinity ? null : v
   ));
-  // turns が null なら元の値（既存の config から）を保持
   if (serializable.conversation && serializable.conversation.turns == null) {
     serializable.conversation.turns = 20;
   }
+  stripSecretsAndDerived(serializable);
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(serializable, null, 2) + "\n", "utf8");
 }

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AITuberKit-duel Admin</title>
+  <link rel="stylesheet" href="/admin.css" />
+</head>
+<body>
+  <header class="hdr">
+    <h1>AITuberKit-duel Admin</h1>
+    <div class="state-row">
+      <span class="pill" id="statePill">starting...</span>
+      <span class="kv">session <b id="sessionNo">-</b></span>
+      <span class="kv">turn <b id="turn">-</b></span>
+      <span class="kv">idle <b id="idle">-</b>s</span>
+      <span class="kv">YT queue <b id="yt">-</b></span>
+      <span class="kv">topic temp <b id="topicTemp">-</b></span>
+    </div>
+    <div class="topic-row">
+      <span class="topic-label">現在の話題</span>
+      <span class="topic-text" id="topic">-</span>
+      <span class="topic-source" id="source">-</span>
+    </div>
+  </header>
+
+  <section class="controls">
+    <button id="btnSkip">▶ Skip Topic</button>
+    <button id="btnPause">⏸ Pause</button>
+    <button id="btnResume" disabled>▶ Resume</button>
+    <button id="btnRestart" class="danger">⟳ Restart duel</button>
+    <span class="ctrl-msg" id="ctrlMsg"></span>
+  </section>
+
+  <main class="main">
+    <section class="cfg">
+      <div class="cfg-head">
+        <h2>config.json</h2>
+        <div class="cfg-tools">
+          <button id="btnLoadConfig">Reload from disk</button>
+          <button id="btnSaveConfig" class="primary">Save &amp; Restart</button>
+          <span id="saveResult" class="save-result"></span>
+        </div>
+      </div>
+      <textarea id="configEditor" spellcheck="false" placeholder="loading..."></textarea>
+      <div class="cfg-help">
+        保存時に <code>config.json.bak</code> を自動作成します。設定反映には会話の再起動が走ります。
+      </div>
+    </section>
+
+    <section class="logs">
+      <div class="logs-head">
+        <h2>Live Log</h2>
+        <div class="logs-tools">
+          <label><input type="checkbox" id="logAutoScroll" checked /> auto-scroll</label>
+          <label><input type="checkbox" id="logShowLine" checked /> line</label>
+          <label><input type="checkbox" id="logShowSay" checked /> say</label>
+          <label><input type="checkbox" id="logShowEvent" checked /> event</label>
+          <button id="btnLogClear">Clear</button>
+        </div>
+      </div>
+      <div id="logView" class="log-view"></div>
+    </section>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>
