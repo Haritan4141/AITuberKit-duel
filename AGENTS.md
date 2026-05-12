@@ -23,7 +23,9 @@ src/
   overlay.mjs       … OBS overlay HTTP server (:8787)
   topicBrain.mjs    … 話題生成（AI + フォールバック）
   conversation.mjs  … 会話ループ・generate / runConversation
-  progress.mjs      … 進捗監視の単一状態
+  state.mjs         … runtime 状態 (pause / topicSkip / restart / stall)
+  server.mjs        … 統合 HTTP サーバー (:8787) /overlay と /admin と /api/* をルーティング
+  admin.mjs         … /api/* ハンドラ群 (status/config/skip-topic/pause/resume/log/stream)
   main.mjs          … エントリポイント
 overlay/            … OBS ブラウザソース用のフロント
 aituber-kit/        … AITuberKit 本体（A/B 共通。PORT で 2 プロセス起動）
@@ -46,10 +48,25 @@ aituber-kit/        … AITuberKit 本体（A/B 共通。PORT で 2 プロセス
   - `YT_API_KEY="..."`
   - `YT_VIDEO_ID="..."`
 
-## OBS テロップ
-- ブラウザソースに `http://127.0.0.1:8787/overlay`
+## OBS テロップ / 管理 UI
+- OBS ブラウザソース: `http://127.0.0.1:8787/overlay`
+- 管理 UI:           `http://127.0.0.1:8787/admin`
+  - 設定編集 (config.json) / pause / resume / skip-topic / restart / ライブログ表示
+
+## API（GUI から / curl から）
+| Method | Path | 用途 |
+|---|---|---|
+| GET  | /api/status      | 現在の sessionNo / turn / topic / paused / idleSec / queueLen |
+| GET  | /api/config      | disk の config.json を返す（secrets 含まず） |
+| POST | /api/config      | 設定を保存 (`.bak` 自動作成) + reload + 会話再起動 |
+| POST | /api/skip-topic  | 次ターンで話題切替を強制 |
+| POST | /api/pause       | 一時停止 |
+| POST | /api/resume      | 再開 |
+| GET  | /api/log/stream  | SSE (events: line / say / event) |
 
 ## 変更時の注意
 - 日本語コメントを含むため、**UTF-8 で保存**する。
 - 文字化け / 構文崩れが疑われる場合は、まず該当ブロックの UTF-8 再保存を行う。
 - 設定値の追加は `config.json` 側を優先し、`src/` 内に値をハードコードしない。
+- `config.json` には **secret を書かない**。API キー類は `.env` のみ。`writeConfigToDisk` の `stripSecretsAndDerived` で `apiKey` / `paths` を必ず除外。
+- 各モジュールで `const { ... } = config.xxx` の destructure をしない。`reloadConfig()` で値が変わるため、関数内で `config.section.field` を都度参照する。

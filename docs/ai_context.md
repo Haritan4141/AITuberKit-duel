@@ -4,7 +4,7 @@
 > プロジェクトの現在地・判断履歴・未完了事項をここに集約し、セッション間で情報が失われないようにします。
 > **重要な進捗があったら必ずこのファイルを更新してください**（運用ルール参照）。
 
-最終更新: 2026-05-12
+最終更新: 2026-05-12（GUI 化第一弾を完了）
 
 ---
 
@@ -31,21 +31,22 @@ AITuberKit/
 ├── config.json               ← ★ 設定値の単一ソース（編集すべきはここ）
 ├── src/
 │   ├── main.mjs              エントリポイント (SIGINT/SIGTERM 1 回登録)
-│   ├── config.mjs            config.json + .env 読込み
-│   ├── log.mjs               console + JSONL ロガー (logSay / logEvent)
+│   ├── config.mjs            config.json + .env 読込み / reloadConfig() / writeConfigToDisk()
+│   ├── state.mjs             runtime 状態 (pause / topicSkip / restart / stall) の単一ソース
+│   ├── log.mjs               console + JSONL ロガー + SSE 用 logEmitter
 │   ├── text.mjs              感情タグ / 文頭・語尾フィルタ / clip
 │   ├── retry.mjs             withRetry (指数バックオフ) + fetchWithTimeout
 │   ├── ollama.mjs            Ollama 呼び出し
 │   ├── aituber.mjs           AITuberKit /api/messages へ direct_send
 │   ├── youtube.mjs           Live Chat polling + AbortController で即時停止
-│   ├── overlay.mjs           OBS overlay HTTP server (:8787) + state
+│   ├── overlay.mjs           OBS overlay の state + テンプレ展開（HTTP は server.mjs 側）
 │   ├── topicBrain.mjs        話題生成 (AI + フォールバック)
-│   ├── progress.mjs          進捗監視の単一状態 (stall 検知)
-│   └── conversation.mjs      会話ループ・generate / runConversation
-├── overlay/                  OBS ブラウザソース用
-│   ├── overlay.html
-│   ├── overlay.css
-│   └── overlay.js
+│   ├── conversation.mjs      会話ループ・generate / runConversation
+│   ├── server.mjs            統合 HTTP サーバー (:8787) /overlay と /admin と /api/* をルーティング
+│   └── admin.mjs             /api/* ハンドラ群 (status/config/skip-topic/pause/resume/log/stream)
+├── overlay/                  ブラウザフロント
+│   ├── overlay.html / .css / .js   OBS ブラウザソース用テロップ
+│   └── admin.html  / .css  / .js   管理 UI (http://127.0.0.1:8787/admin)
 ├── aituber-kit/              AITuberKit 本体 (A/B 共通)
 │   ├── next.config.js        NEXT_DIST_DIR 対応の 1 行を追加（upstream 改変はこれだけ）
 │   └── public/vrm/           Mafuyu_VRM.vrm / MANUKA.vrm / nikechan_v1.vrm
@@ -71,6 +72,7 @@ AITuberKit/
 3. (任意) VOICEVOX を起動
 4. `start_duel.bat`（テスト/短時間）or `start_duel_watchdog.bat`（長時間配信）で会話開始
 5. 停止は `stop_aituber.bat`
+6. 管理 UI: ブラウザで `http://127.0.0.1:8787/admin` を開く（設定編集 / pause / resume / skip-topic / ライブログ）
 
 ### ビルド / テスト
 - duel 側は build なし（Node.js + ES Modules で直接起動）。構文確認は `node --check src/*.mjs`。
@@ -80,19 +82,14 @@ AITuberKit/
 
 ## 現在の作業目的
 
-直近のゴール: **GUI 化** — 設定変更（モデル / 温度 / 話題 / VRM 切替など）と制御（pause/resume/skip-topic）をブラウザ UI から操作可能にする。
+**GUI 化 第一弾は完了** — ブラウザ管理画面 (`:8787/admin`) で設定編集 / pause / resume / skip-topic / ライブログ表示まで動作する状態。
 
-### 達成したい状態
-1. ユーザーが `config.json` を直接編集しなくても GUI から設定を変更できる
-2. 会話中に話題スキップ / 一時停止 / 再開ができる
-3. ログ（発話・話題切替）をブラウザでライブ表示できる
-4. 既存の OBS overlay (`:8787/overlay`) と共存できる
-
-### 変更対象の範囲（想定）
-- `src/overlay.mjs` を拡張、または別途 `src/api.mjs` を新設して制御エンドポイント追加
-- `overlay/admin.html` 等の管理画面フロントエンドを新規追加
-- `src/config.mjs` を「ホットリロード可能」にするか検討
-- AITuberKit 本体 (`aituber-kit/`) は触らない方針
+### 次フェーズの候補（未着手）
+1. **設定の項目別フォーム化** — 現在は textarea で生 JSON を編集。よく触る項目（speaker.temperature, charName, topicBrain.temperature, topicInterval 等）をフォーム化して、JSON 編集と相互同期。
+2. **ロングラン検証** — 実 LLM 起動下で数時間流して、reload / restart / topic-skip / pause/resume の総合挙動を確認。
+3. **メトリクス収集** — JSONL ログから 1 セッションあたりの平均 turn 数 / topic 切替頻度 / 再起動回数を集計するスクリプト or admin UI のサマリーカード。
+4. **VRM 切替 API の探索** — AITuberKit 側に外部から VRM を切り替える endpoint があるか調査（現状は localStorage 経由のブラウザ操作のみ）。
+5. **Electron 化** — 配布のしやすさで現在の HTML を `BrowserWindow.loadURL("http://127.0.0.1:8787/admin")` で包む。優先度は低い。
 
 ---
 
@@ -101,18 +98,24 @@ AITuberKit/
 ### コミット履歴（新しい順）
 | commit | 内容 |
 |---|---|
+| (latest) | 管理 UI フロント (overlay/admin.*) を追加 + secrets / paths を disk から除外 |
+| `d94d03e` | HTTP サーバー統合 + 管理用 API + 会話ループとの結線 (src/server.mjs / src/admin.mjs 新設) |
+| `ac5722e` | config を mutable 化し reloadConfig() を実装。state.mjs に runtime 状態を集約 |
+| `c5fa5d2` | docs/ai_context.md を追加: AI エージェント引き継ぎ用コンテキスト |
 | `b4c65a7` | bat ファイルを CRLF + UTF-8 (BOM なし) に統一、`start_aituber.bat` の `^` 行継続バグを修正、`.gitattributes` 追加 |
-| `53fedfa` | 運用スクリプト改善 (`stop_aituber.bat` ピンポイント停止 / watchdog コメント修正) + `AGENTS.md` を新構成に更新 |
-| `e6eea39` | `overlay/overlay.js`: 話題更新時のみ DOM/fitFont 再計算 |
-| `44aad5b` | `duel.mjs` を `src/` 12 モジュールに分割し設定値を `config.json` に外出し。副作用として SIGINT 二重登録 / fetch タイムアウト / リトライ指数化 / メモリ上限 / AbortController など 10 件の指摘を一括解消 |
-| `1523989` | A/B kit 統合: `aituber-kit-B/` を 369 ファイル削除、`next.config.js` に `NEXT_DIST_DIR` 環境変数対応を追加、`start_aituber.bat` を 1 kit + 2 プロセス構成に改修、VRM を `aituber-kit/public/vrm/` に集約 |
+| `53fedfa` | 運用スクリプト改善 + `AGENTS.md` を新構成に更新 |
+| `e6eea39` | `overlay.js`: 話題更新時のみ DOM/fitFont 再計算 |
+| `44aad5b` | `duel.mjs` を `src/` 12 モジュールに分割し設定値を `config.json` に外出し |
+| `1523989` | A/B kit 統合: `aituber-kit-B/` 削除、`NEXT_DIST_DIR` 対応、VRM 集約 |
 
 ### 採用した設計判断
 1. **A/B kit は 1 ディレクトリ共有 + dev 2 プロセス**: `aituber-kit-B/` は src/public がほぼ完全重複だったため削除。同じプロジェクトから `PORT=3000 NEXT_DIST_DIR=.next-A` と `PORT=3001 NEXT_DIST_DIR=.next-B` を別ウィンドウで起動。`.next` 衝突は `distDir` を分けて回避。
-2. **設定の単一ソースは `config.json`**: GUI 化を見据えて、コード内のリテラル定数を全部 JSON に外出し。`src/config.mjs` が起動時に 1 度だけ読み込み `Object.freeze`。
+2. **設定の単一ソースは `config.json`**: GUI 化を見据えてコード内のリテラル定数を全部 JSON に外出し。`config` オブジェクトは mutable 参照を共有し、`reloadConfig()` で disk から再読込み（各モジュールは destructure せず `config.section.field` で都度参照）。
 3. **upstream (`aituber-kit/`) への改変は最小限**: `next.config.js` に `NEXT_DIST_DIR` 1 行を追加しただけ。AITuberKit 本体を fork/改造する方向には進まない方針。
 4. **bat は CRLF + UTF-8 (BOM なし)**: Write tool は LF で書くため、`.gitattributes` で `*.bat eol=crlf` を強制。
 5. **VRM 切替はブラウザ側 localStorage で**: ポート別 origin で独立保存される。同梱 VRM は `aituber-kit/public/vrm/` 1 箇所に集約。
+6. **GUI 反映方式は「会話セッション再起動」**: hot-reload ではなく、`requestRestart()` で `runConversation` を throw → 外側ループが新セッションを開始。プロセス再起動なしで watchdog 不要、state 整合性も担保。
+7. **secrets は disk に書かない**: `youtube.apiKey` は `.env` から実行時注入。`writeConfigToDisk` で `stripSecretsAndDerived` を必ず通し、`apiKey` と `paths` を除外（過去に POST 経由で disk に漏れたケースあり、コミット前に修復済み）。
 
 ### 解消済みのレビュー指摘
 - SIGINT 二重登録（旧 duel.mjs L434 と L1269）→ `src/main.mjs` で 1 回のみ登録
@@ -134,39 +137,54 @@ AITuberKit/
 
 ## 未完了タスク
 
-### GUI 化に向けて（次のフェーズ）
-- [ ] `src/api.mjs` 新設 or `overlay.mjs` 拡張で制御エンドポイント:
-  - `GET /status` 現在の sessionNo / turn / topic / 設定スナップショット
-  - `POST /config` 設定変更（hot-reload か再起動かを検討）
-  - `POST /skip-topic` 話題スキップ
-  - `POST /pause` / `POST /resume` 一時停止
-- [ ] `/log/stream` SSE エンドポイントでログのライブ配信
-- [ ] 管理 UI 本体（最初は `overlay/admin.html` の単独 HTML でも十分）
-- [ ] `config.json` のホットリロード or 「設定変更 → duel.mjs 自動再起動」のどちらにするか判断
-- [ ] GUI から VRM を切り替える方式の検討（AITuberKit 側 API の調査が必要）
+### GUI 化 第一弾は完了
+| 項目 | 状態 |
+|---|---|
+| `GET /api/status` | ✅ 動作確認済 |
+| `GET /api/config` (disk 生 JSON) | ✅ 動作確認済 |
+| `POST /api/config` (validation + bak + reload + restart) | ✅ 動作確認済 |
+| `POST /api/skip-topic` | ✅ 動作確認済 |
+| `POST /api/pause` / `POST /api/resume` | ✅ 動作確認済 |
+| `GET /api/log/stream` (SSE) | ✅ 実装済 (実 LLM での連続動作は未検証) |
+| `/admin` 画面 | ✅ 動作確認済 (curl で HTML/CSS/JS 配信を確認) |
 
-### 保留中の判断
-- AITuberKit 本体に手を入れるか否か（現状: 入れない方針、`next.config.js` の 1 行のみ）
-- Electron / Tauri で GUI を内包するか、ブラウザ単独 HTML で済ませるか
-- 設定変更の即反映 vs 再起動方式（即反映だと state 整合性を慎重に設計する必要）
+### 次フェーズ候補（未着手）
+- [ ] 設定の項目別フォーム化（speaker 温度や TopicBrain 関連の頻出項目を専用 UI に）
+- [ ] 実 LLM 起動下のロングラン検証（Ollama + AITuberKit A/B を起動して数時間流す）
+- [ ] メトリクスサマリー（duel_log.jsonl の集計を admin に表示）
+- [ ] VRM 切替 API の探索（AITuberKit 側に外部から切り替える endpoint があるか）
+- [ ] Electron 化（優先度低）
+
+### 保留中の判断（決着済を含む）
+- ~~AITuberKit 本体に手を入れるか~~ → 入れない方針確定（`next.config.js` の 1 行のみ）
+- ~~Electron vs ブラウザ単独~~ → ブラウザ単独 HTML 確定
+- ~~設定変更の反映方式~~ → 再起動方式確定
 
 ### 既知の問題（低優先）
-- なし（直近の動作確認ではユーザーが起動成功を確認済み）
+- `/admin` の `Restart duel` ボタンは「現在の config を POST し直す」実装。`POST /api/config` の副作用に依存しているのでわかりにくい。専用の `POST /api/restart` エンドポイントを足すと綺麗。
+- `/api/config` の validation は浅い (必須セクションの存在チェックのみ)。型まで踏み込むなら JSON Schema 導入を検討。
 
 ---
 
 ## 動作確認・検証状況
 
 ### 確認できたこと
-- `node --check` で `duel.mjs` + `src/*.mjs` 全 12 ファイルの構文 OK
-- `duel.mjs` を AITuberKit 未起動下で約 4 秒 dry run → 設定読込み / Topic 生成 / OBS overlay 起動 / fetch リトライ動作（指数バックオフ）まで確認
+- `node --check` で `duel.mjs` + `src/*.mjs` 全 13 ファイルの構文 OK
+- AITuberKit 未起動下での dry run で設定読込み / Topic 生成 / overlay 起動 / fetch リトライ（指数バックオフ）まで確認
 - ユーザー側で `start_aituber.bat` + `start_duel.bat` の実行を確認、`fetch failed` 連発が解消したことを確認（2026-05-12）
-- `start_aituber.bat` の出力を見て A/B/Ollama の 3 ウィンドウが正常に開くこと
+- GUI 化後の API 群を curl で疎通確認:
+  - `GET /api/status` → JSON state
+  - `POST /api/pause` → `{paused:true}`、再度 `GET` で `paused:true` 維持
+  - `POST /api/resume` → `{paused:false}`
+  - `POST /api/skip-topic` → `{ok:true}`
+  - `POST /api/config` (current 設定をエコーバック) → `{ok:true,restarting:true}` ＋ ログに `[ADMIN] config updated and reloaded -> request restart`
+- `/admin` 画面の HTML/CSS/JS 配信を確認 (curl で size 確認、後の動作確認はユーザー側で実 LLM 起動下で)
 
 ### まだ確認できていないこと
-- 実 LLM (Ollama gemma3:12b) を通した連続会話の安定性（数十分以上のロングランは未検証）
-- `start_duel_watchdog.bat` による 30 分再起動が新構成でも動くこと（旧 `duel.mjs` から呼び方は変わっていないので動くはず）
-- YouTube コメント注入の動作（`YT_API_KEY` + `YT_VIDEO_ID` が `.env` にあれば動くはず）
+- ブラウザで `/admin` を実際に開いた時の **UI 全体の挙動**（ステータス表示の即時更新、SSE のリアルタイム描画、save & restart の往復）
+- 実 LLM (Ollama gemma3:12b) を通した連続会話の安定性（数十分以上のロングラン）
+- `start_duel_watchdog.bat` による 30 分再起動が新構成でも動くこと
+- YouTube コメント注入の動作
 - OBS の「ブラウザソース」に `http://127.0.0.1:8787/overlay` を入れたときの表示
 
 ### よく使う検証コマンド
@@ -217,6 +235,11 @@ file start_aituber.bat
 - ブラウザの localStorage に保存された AITuberKit 側設定（VRM・背景・各種設定）は、ユーザーが手動で組み上げた資産。これを失わせるような構成変更は事前に確認する。
 - `.env` の内容（API キー類）は表示・コミットしない。
 - `インストーラー/` `素材/` `VRM/` ディレクトリは `.gitignore` 済み。中身を勝手に削除しない。
+
+### secrets を disk に書かない
+- `config.json` には絶対に `apiKey` を含めない。API キーは `.env` (`YT_API_KEY`) のみ。
+- `writeConfigToDisk` は `stripSecretsAndDerived` を必ず通す。新たに secret を増やす場合はその関数で削除リストに追加。
+- `config.json.bak` も `.gitignore` 済みだが、念のため中身に secrets が無いことを確認すること。
 
 ### 不明点の扱い
 - 推測で大きく進めず、必要に応じてユーザーに確認する（AskUserQuestion）。
@@ -290,3 +313,4 @@ file start_aituber.bat
 | 日付 | 更新者 | 内容 |
 |---|---|---|
 | 2026-05-12 | Claude Opus 4.7 | 初版作成。A/B 統合 / duel.mjs 分割 / overlay 最適化 / 運用スクリプト改善 / bat 改行修正 までの履歴を集約。GUI 化を次フェーズとして設定。 |
+| 2026-05-12 | Claude Opus 4.7 | GUI 化第一弾を完了: config の mutable 化 + reloadConfig、state.mjs 新設、HTTP サーバー統合 (server.mjs)、API ハンドラ (admin.mjs)、管理 UI フロント (overlay/admin.*)。`writeConfigToDisk` から secrets / paths を除外する `stripSecretsAndDerived` を追加。動作確認状況と次フェーズ候補を更新。 |
