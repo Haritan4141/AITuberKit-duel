@@ -5,19 +5,24 @@ echo ===============================
 echo  Stopping AITuberKit
 echo ===============================
 
-REM ---- start_aituber.bat で開いたウィンドウタイトルで停止（A/B/Ollama）----
-echo Speaker A / B のウィンドウを停止します
+REM ---- start_aituber.bat で開いたウィンドウタイトルで停止（A/B/Ollama/Duel）----
+echo Speaker A / B / Duel のウィンドウを停止します
 taskkill /FI "WINDOWTITLE eq AITuberKit A*" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq AITuberKit B*" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq Ollama*" /T /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Starting duel.mjs*" /T /F >nul 2>&1
 
-REM ---- 念のためポートでも特定停止 (3000 / 3001) ----
+REM ---- 念のためポートでも特定停止 (3000 / 3001 / 8787=duel) ----
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000 " ^| findstr "LISTENING"') do (
-    echo   PID %%a を停止 (port 3000)
+    echo   PID %%a を停止 (port 3000 = AITuberKit A)
     taskkill /PID %%a /F /T >nul 2>&1
 )
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001 " ^| findstr "LISTENING"') do (
-    echo   PID %%a を停止 (port 3001)
+    echo   PID %%a を停止 (port 3001 = AITuberKit B)
+    taskkill /PID %%a /F /T >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8787 " ^| findstr "LISTENING"') do (
+    echo   PID %%a を停止 (port 8787 = duel.mjs / OBS overlay / Admin UI)
     taskkill /PID %%a /F /T >nul 2>&1
 )
 
