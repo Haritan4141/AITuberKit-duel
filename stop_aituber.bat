@@ -33,5 +33,4 @@ taskkill /IM ollama_app.exe /F >nul 2>&1
 
 echo.
 echo 停止しました。
-echo start_aituber.bat 以外で動かしている node.exe は影響しません。
 pause
