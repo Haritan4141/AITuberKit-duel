@@ -25,7 +25,7 @@ npm install
 ※ 本構成では `aituber-kit/` 1 つを 2 プロセス（PORT=3000 / 3001）で起動します。
    それぞれの dev サーバーは `.next-A` / `.next-B` を `distDir` に使うので互いに衝突しません。
 
-2) LLMモデルのダウンロード（初期設定はgemma3:12b）
+3) LLMモデルのダウンロード（初期設定はgemma3:12b）
 ```bat
 ollama pull gemma3:12b
 ```
@@ -64,17 +64,15 @@ http://127.0.0.1:8787/admin で **「▶ Start」** ボタンを押すと会話�
 ```bat
 start_duel_watchdog.bat
 ```
+※ watchdog は duel.mjs を 30 分ごとに kill して再起動します。`start_aituber.bat` ですでに duel.mjs を立てている場合は **ポート 8787 が競合する** ため、watchdog を使うときは `start_aituber.bat` ではなく **個別に AITuberKit A/B + Ollama を起動** して、duel は watchdog 側に任せてください。長時間配信では `config.json` の `"conversation": { "autoStart": true }` を併用するのが楽です。
 
 ## YouTube コメント連携 (任意)
-`duel.mjs` の以下を設定してください。
-- `YT_API_KEY`
-- `YT_VIDEO_ID`
-
-環境変数で `YT_API_KEY` を設定して起動すると簡単です。
-```bat
-set YT_API_KEY=YOUR_KEY
-start_duel.bat
+プロジェクトルートに `.env` を作成し、以下を記入してください。
+```ini
+YT_API_KEY="YOUR_KEY"
+YT_VIDEO_ID="YOUR_VIDEO_ID"
 ```
+`.env` は duel.mjs 起動時に読み込まれ、`YT_API_KEY` があればコメント取得が有効になります。`.env` は `.gitignore` 済みなのでリポジトリには上がりません。
 
 ## OBS 話題テロップ
 OBS の「ブラウザ」ソースに以下を追加してください。

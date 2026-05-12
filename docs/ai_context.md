@@ -4,7 +4,7 @@
 > プロジェクトの現在地・判断履歴・未完了事項をここに集約し、セッション間で情報が失われないようにします。
 > **重要な進捗があったら必ずこのファイルを更新してください**（運用ルール参照）。
 
-最終更新: 2026-05-12（idle 待機モード + GUI Start/Stop ボタン追加）
+最終更新: 2026-05-12（idle 待機モード + GUI Start/Stop + README 整合性チェック）
 
 ---
 
@@ -50,10 +50,10 @@ AITuberKit/
 ├── aituber-kit/              AITuberKit 本体 (A/B 共通)
 │   ├── next.config.js        NEXT_DIST_DIR 対応の 1 行を追加（upstream 改変はこれだけ）
 │   └── public/vrm/           Mafuyu_VRM.vrm / MANUKA.vrm / nikechan_v1.vrm
-├── start_aituber.bat         Ollama + AITuberKit A/B を別ウィンドウで起動
-├── start_duel.bat            duel.mjs を 1 回起動
-├── start_duel_watchdog.bat   run_duel_watchdog.ps1 経由で 30 分ごとに再起動
-├── stop_aituber.bat          A/B + Ollama をピンポイント停止
+├── start_aituber.bat         Ollama + A/B + duel(idle) を起動し /admin をブラウザで自動オープン
+├── start_duel.bat            duel.mjs 単体起動（ログを同じ窓で見たいとき）
+├── start_duel_watchdog.bat   30 分ごとに duel を再起動 (autoStart=true 環境で使う想定。start_aituber.bat と併用すると 8787 競合)
+├── stop_aituber.bat          A/B + Ollama + duel.mjs を一括停止
 ├── run_duel_watchdog.ps1     watchdog 本体
 ├── .gitattributes            *.bat / *.cmd / *.ps1 を eol=crlf 固定
 ├── .env                      YT_API_KEY / YT_VIDEO_ID のみ
@@ -83,7 +83,7 @@ AITuberKit/
 
 ## 現在の作業目的
 
-**GUI 化 第一弾は完了** — ブラウザ管理画面 (`:8787/admin`) で設定編集 / pause / resume / skip-topic / ライブログ表示まで動作する状態。
+**GUI 化（第一弾 + 第二弾）まで完了** — ブラウザ管理画面 (`:8787/admin`) で設定編集 / Start / Stop / pause / resume / skip-topic / ライブログ表示まで動作する状態。`start_aituber.bat` 一発で AITuberKit A/B + Ollama + duel.mjs(idle) + Admin UI 自動オープンまで揃う。会話の開始は GUI の Start ボタンから（`config.conversation.autoStart=true` で従来通り自動開始も可）。
 
 ### 次フェーズの候補（未着手）
 1. **設定の項目別フォーム化** — 現在は textarea で生 JSON を編集。よく触る項目（speaker.temperature, charName, topicBrain.temperature, topicInterval 等）をフォーム化して、JSON 編集と相互同期。
@@ -99,7 +99,9 @@ AITuberKit/
 ### コミット履歴（新しい順）
 | commit | 内容 |
 |---|---|
-| (latest) | duel に idle 待機モード追加 (state.running) + GUI Start/Stop ボタン + start_aituber.bat で duel も立てる + server.unref() 削除 (idle 待機時の早期 exit 回避) |
+| `0afeccb` | stop_aituber.bat: 文字化けする echo 行（「動かしている」周辺）を削除 |
+| `ce8f7ba` | stop_aituber.bat: 全角括弧の文字化けを修正（後にバイト境界問題と判明） |
+| `d606e29` | idle 待機モード + GUI Start/Stop ボタン + start_aituber.bat 統合 (state.running / server.unref 撤去) |
 | `3a02e77` | start_aituber.bat 起動後に /admin をブラウザで自動オープン（旧、後で書き換え） |
 | `10e9d30` | stop_aituber.bat に duel.mjs (port 8787) の停止を追加 |
 | `89d4900` | docs/ai_context.md と AGENTS.md を GUI 化第一弾の完了状態に更新 |
@@ -217,7 +219,10 @@ file start_aituber.bat
 | `config.json` | 全設定の単一ソース | **高**（GUI の編集対象） |
 | `src/conversation.mjs` | 会話ループ本体 | 中 |
 | `src/topicBrain.mjs` | 話題生成 | 中 |
-| `src/overlay.mjs` | OBS overlay HTTP server | GUI 化で拡張予定 |
+| `src/overlay.mjs` | OBS overlay の state + テンプレ展開（HTTP は server.mjs 側） | 低 |
+| `src/server.mjs` | 統合 HTTP サーバー (:8787) | API 追加時 |
+| `src/admin.mjs` | /api/* ハンドラ | API 追加時 |
+| `src/state.mjs` | runtime 状態 (running/paused/topicSkip/restart) | 状態追加時 |
 | `overlay/overlay.*` | OBS フロント | 演出変更時 |
 | `aituber-kit/next.config.js` | upstream に 1 行追加済み | **低**（触らない方針） |
 | `aituber-kit/` その他 | upstream | **触らない** |
@@ -236,7 +241,7 @@ file start_aituber.bat
 
 ### 影響範囲が大きい変更
 - `config.json` のスキーマ変更 → `src/config.mjs` の読み込み + 全モジュールに影響
-- `src/conversation.mjs` の `runConversation` フロー変更 → セッション再起動・stall 検知の挙動と関わるため、`progress.mjs` も併せて検討
+- `src/conversation.mjs` の `runConversation` フロー変更 → セッション再起動・stall 検知・pause/start-stop の挙動と関わるため、`state.mjs` も併せて検討
 - `aituber-kit/` への改変 → upstream pull 時の競合の温床になるので、明示的な指示がない限り避ける
 
 ### ユーザー資産を尊重する
@@ -323,3 +328,4 @@ file start_aituber.bat
 | 2026-05-12 | Claude Opus 4.7 | 初版作成。A/B 統合 / duel.mjs 分割 / overlay 最適化 / 運用スクリプト改善 / bat 改行修正 までの履歴を集約。GUI 化を次フェーズとして設定。 |
 | 2026-05-12 | Claude Opus 4.7 | GUI 化第一弾を完了: config の mutable 化 + reloadConfig、state.mjs 新設、HTTP サーバー統合 (server.mjs)、API ハンドラ (admin.mjs)、管理 UI フロント (overlay/admin.*)。`writeConfigToDisk` から secrets / paths を除外する `stripSecretsAndDerived` を追加。動作確認状況と次フェーズ候補を更新。 |
 | 2026-05-12 | Claude Opus 4.7 | idle 待機モード追加。`state.running` を新設し `main.mjs` を「running になるまで待機 → ループ」に変更。`POST /api/start` / `POST /api/stop` を新設し、GUI に Start/Stop ボタンを追加。`config.conversation.autoStart` (デフォルト false)。`start_aituber.bat` で A/B + Ollama + duel (idle) + ブラウザ自動オープンまで実行する形に統合。idle 待機時の Node.js 早期 exit を防ぐため `server.unref()` を撤去。 |
+| 2026-05-12 | Claude Opus 4.7 | README と整合性チェック: README の手順番号修正 / YouTube 連携を `.env` ベースに書き換え / watchdog の注意書き追加 / `stop_aituber.bat` の文字化け修正 (cmd chcp 65001 の UTF-8 解釈問題で「動かしている」が誤コマンド扱いされていた echo 行を削除)。ai_context.md のディレクトリ構成 / `progress.mjs` の参照 / `overlay.mjs` の役割表記を新構成に揃えた。 |
