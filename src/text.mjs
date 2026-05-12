@@ -1,12 +1,10 @@
 // テキスト処理：感情タグ正規化 / 文頭・語尾フィルタ / clip / サニタイズ / 日本語判定
+// config は関数内で参照（reload で値が変わるため）。
 
 import { config } from "./config.mjs";
 
 export const EMO_SET = ["neutral", "happy", "angry", "sad", "relaxed", "surprised"];
 const EMO_TAG_RE = new RegExp(`^\\[(${EMO_SET.join("|")})\\]\\s*([\\s\\S]*)$`, "i");
-
-const { maxChars, baseWaitMs, perCharMs, maxWaitMs } = config.conversation;
-const COMMENT_MAX_LEN = config.youtube.commentMaxLen;
 
 export function oneLine(s) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
@@ -24,7 +22,7 @@ export function sanitizeChatText(s) {
     .replace(/\[|\]/g, "")
     .replace(/`{3,}/g, "")
     .replace(/[<>]/g, "")
-    .slice(0, COMMENT_MAX_LEN)
+    .slice(0, config.youtube.commentMaxLen)
     .trim();
 }
 
@@ -59,7 +57,7 @@ export function fallbackEmotionForSpeaker(speaker) {
 }
 
 // =================================================
-// 文頭フィルタ：定型的な出だしを潰す
+// 文頭フィルタ
 // =================================================
 const STARTER_BLACKLIST = [
   /^はい[！、]/,
@@ -103,7 +101,7 @@ export function normalizeStarterTagged(text) {
 }
 
 // =================================================
-// 語尾フィルタ：「だよね/かな/かも」の連発を防ぐ
+// 語尾フィルタ
 // =================================================
 const ENDING_PATTERNS = [
   { re: /だよね[。！!？?]*\s*$/, alts: ["だと思う", "って感じ", "かな", "かも"] },
@@ -148,10 +146,11 @@ export function normalizeEndingTagged(text) {
 }
 
 // =================================================
-// 長文クリップ：句点で自然に切る
+// 長文クリップ
 // =================================================
 export function clip(text) {
   if (!text) return "";
+  const maxChars = config.conversation.maxChars;
   if (text.length <= maxChars) return text;
   const cut = text.slice(0, maxChars);
   const m = cut.match(/(.+[。！？!?])/);
@@ -159,7 +158,6 @@ export function clip(text) {
   return cut.replace(/[、。！？!?]*$/, "") + "…";
 }
 
-// タグを残したまま本文だけ clip
 export function clipTagged(text) {
   const s = String(text ?? "").trim();
   const m = s.match(EMO_TAG_RE);
@@ -168,6 +166,7 @@ export function clipTagged(text) {
 }
 
 export function estimateSpeakMs(text) {
+  const { baseWaitMs, perCharMs, maxWaitMs } = config.conversation;
   const punct = (text.match(/[。！？]/g) || []).length * 180;
   return Math.min(baseWaitMs + text.length * perCharMs + punct, maxWaitMs);
 }

@@ -3,17 +3,15 @@
 import { config } from "./config.mjs";
 import { fetchWithTimeout } from "./retry.mjs";
 
-const { url: OLLAMA_URL, fetchTimeoutMs } = config.ollama;
-
 export async function ollamaChat(model, messages, temperature) {
   const res = await fetchWithTimeout(
-    OLLAMA_URL,
+    config.ollama.url,
     {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ model, messages, stream: false, temperature }),
     },
-    fetchTimeoutMs
+    config.ollama.fetchTimeoutMs
   );
 
   if (!res.ok) {

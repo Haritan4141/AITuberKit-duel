@@ -1,6 +1,6 @@
 // 会話 1 セッション。Topic Brain と OBS overlay、コメント注入を結線する。
 
-import { config, SPEAKER_A, SPEAKER_B } from "./config.mjs";
+import { config } from "./config.mjs";
 import { logLine, logSay, logEvent } from "./log.mjs";
 import { sleep, withRetry } from "./retry.mjs";
 import { ollamaChat } from "./ollama.mjs";
@@ -17,37 +17,33 @@ import {
   stripLeadingEmotionTag,
 } from "./text.mjs";
 import {
-  TOPIC_BRAIN_TEMP,
   decideNextTopic,
+  getTopicBrainTemp,
   pickTopic,
   pickTopicOwner,
 } from "./topicBrain.mjs";
 import { setOverlayTopic } from "./overlay.mjs";
-import { popLiveCommentDedup, COMMENT_INSERT_RATE_VALUE } from "./youtube.mjs";
-import { isRestartRequested, markProgress } from "./progress.mjs";
-
-const {
-  turns: TURNS,
-  callNameProb: CALL_NAME_PROB,
-  topicInterval: TOPIC_INTERVAL,
-  historyKeepTurns: HISTORY_KEEP_TURNS,
-} = config.conversation;
-
-const TURN_LOG_MAX = config.topicBrain.turnLogMax;
-const USED_TOPICS_MAX = config.topicBrain.usedTopicsMax;
+import { popLiveCommentDedup } from "./youtube.mjs";
+import {
+  consumeTopicSkip,
+  isPaused,
+  isRestartRequested,
+  markProgress,
+  waitWhilePaused,
+} from "./state.mjs";
 
 function speakerTag(s) {
   return `${s.charName}(${s.id})`;
 }
 
 export function speakerById(id) {
-  return id === "B" ? SPEAKER_B : SPEAKER_A;
+  return id === "B" ? config.speakers.B : config.speakers.A;
 }
 
-const shouldCallName = () => Math.random() < CALL_NAME_PROB;
+const shouldCallName = () => Math.random() < config.conversation.callNameProb;
 
 function softResetHistory(history) {
-  const keepMsgs = HISTORY_KEEP_TURNS * 2;
+  const keepMsgs = config.conversation.historyKeepTurns * 2;
   const extra = Math.max(0, history.length - 1 - keepMsgs);
   if (extra > 0) history.splice(1, extra);
 }
@@ -58,7 +54,7 @@ function pushBounded(arr, max, item) {
 }
 
 // =================================================
-// キャラの性格・感情を決めるシステムプロンプト
+// システムプロンプト
 // =================================================
 function makeSystemPrompt(speaker, callName) {
   const emotionText =
@@ -158,10 +154,10 @@ async function generate(speaker, history, input) {
 }
 
 // =================================================
-// コメント注入：たまに YouTube コメントを話題に差し替える
+// コメント注入
 // =================================================
 function maybeInjectLiveComment(defaultLine, overlayContext) {
-  if (Math.random() >= COMMENT_INSERT_RATE_VALUE) return defaultLine;
+  if (Math.random() >= config.youtube.commentInsertRate) return defaultLine;
   const c = popLiveCommentDedup();
   if (!c) return defaultLine;
 
@@ -169,7 +165,7 @@ function maybeInjectLiveComment(defaultLine, overlayContext) {
     setOverlayTopic({
       topic: `コメント: ${c}`,
       source: "Youtube Comment",
-      topicTemp: TOPIC_BRAIN_TEMP,
+      topicTemp: getTopicBrainTemp(),
       sessionNo: overlayContext.sessionNo,
       turn: overlayContext.turn,
     });
@@ -187,7 +183,7 @@ function maybeInjectLiveComment(defaultLine, overlayContext) {
 }
 
 // =================================================
-// セッション開始の第一声（バリエーション）
+// 開幕台詞
 // =================================================
 const OPENING_LINES = [
   (topic) => `[neutral]それじゃあおはなししよう。${topic}についてどう思う？`,
@@ -198,14 +194,38 @@ const OPENING_LINES = [
 ];
 
 function pickOpeningLine(topic) {
-  const fn = OPENING_LINES[Math.floor(Math.random() * OPENING_LINES.length)];
-  return fn(topic);
+  return OPENING_LINES[Math.floor(Math.random() * OPENING_LINES.length)](topic);
+}
+
+// =================================================
+// 話題切替の台詞
+// =================================================
+function pickTopicChangeLine(topic) {
+  const lines = [
+    `話変わるけどいい？${topic}ってどう？`,
+    `ちょっと話題変えたいんだけど、${topic}はどう思う？`,
+    `今の流れで聞いてみたいんだけど、${topic}ってどう思う？`,
+    `そういえばさ、${topic}の話してもいい？`,
+    `少し切り替えたいんだけど、${topic}どうかな？`,
+    `そういえば${topic}の話、してもいい？`,
+    `急だけどさ、${topic}ってどう？`,
+    `ふと思い出したんだけど、${topic}ってどう思う？`,
+    `${topic}の話、今しても平気？`,
+  ];
+  return lines[Math.floor(Math.random() * lines.length)];
 }
 
 // =================================================
 // 1 セッション
 // =================================================
 export async function runConversation(sessionNo) {
+  const SPEAKER_A = config.speakers.A;
+  const SPEAKER_B = config.speakers.B;
+  const TURN_LOG_MAX = config.topicBrain.turnLogMax;
+  const USED_TOPICS_MAX = config.topicBrain.usedTopicsMax;
+  const TOPIC_INTERVAL = config.conversation.topicInterval;
+  const TURNS = config.conversation.turns;
+
   const histA = [{ role: "system", content: "" }];
   const histB = [{ role: "system", content: "" }];
   let skipNextB = false;
@@ -213,11 +233,10 @@ export async function runConversation(sessionNo) {
   const turnLog = [];
   const usedTopics = [];
 
-  // 初期話題
   let topic = pickTopic();
   pushBounded(usedTopics, USED_TOPICS_MAX, topic);
   logLine("[TOPIC]", `#${sessionNo} start: "${topic}" (INIT)`);
-  setOverlayTopic({ topic, source: "INIT", topicTemp: TOPIC_BRAIN_TEMP, sessionNo, turn: 0 });
+  setOverlayTopic({ topic, source: "INIT", topicTemp: getTopicBrainTemp(), sessionNo, turn: 0 });
   logEvent({ sessionNo, turn: 0, kind: "topic", topic, source: "INIT" });
 
   let last = pickOpeningLine(topic);
@@ -236,6 +255,7 @@ export async function runConversation(sessionNo) {
   await sleep(estimateSpeakMs(last));
 
   for (let i = 1; i <= TURNS; i++) {
+    if (isPaused()) await waitWhilePaused();
     softResetHistory(histA);
     softResetHistory(histB);
 
@@ -262,6 +282,8 @@ export async function runConversation(sessionNo) {
       inputForA = b;
     }
 
+    if (isPaused()) await waitWhilePaused();
+
     // A の発話
     const a = await generate(SPEAKER_A, histA, inputForA);
     logLine(
@@ -278,8 +300,9 @@ export async function runConversation(sessionNo) {
     await sleep(estimateSpeakMs(a));
     last = a;
 
-    // 話題切替
-    if (i % TOPIC_INTERVAL === 0) {
+    // 話題切替: 通常はターン経過、または GUI からの skip 要求
+    const topicSkip = consumeTopicSkip();
+    if (topicSkip || i % TOPIC_INTERVAL === 0) {
       const next = await decideNextTopic({
         sessionNo,
         turn: i,
@@ -291,22 +314,9 @@ export async function runConversation(sessionNo) {
       topic = next.topic;
       pushBounded(usedTopics, USED_TOPICS_MAX, topic);
       setOverlayTopic({ topic, source: next.source, topicTemp: next.topicTemp, sessionNo, turn: i });
-      logEvent({ sessionNo, turn: i, kind: "topic", topic, source: next.source });
+      logEvent({ sessionNo, turn: i, kind: "topic", topic, source: next.source, skipped: topicSkip });
 
-      const topicChangeLines = [
-        `話変わるけどいい？${topic}ってどう？`,
-        `ちょっと話題変えたいんだけど、${topic}はどう思う？`,
-        `今の流れで聞いてみたいんだけど、${topic}ってどう思う？`,
-        `そういえばさ、${topic}の話してもいい？`,
-        `少し切り替えたいんだけど、${topic}どうかな？`,
-        `そういえば${topic}の話、してもいい？`,
-        `急だけどさ、${topic}ってどう？`,
-        `ふと思い出したんだけど、${topic}ってどう思う？`,
-        `${topic}の話、今しても平気？`,
-      ];
-      const picked = topicChangeLines[Math.floor(Math.random() * topicChangeLines.length)];
-
-      last = `[neutral]${picked}`;
+      last = `[neutral]${pickTopicChangeLine(topic)}`;
       last = maybeInjectLiveComment(last, { sessionNo, turn: i });
       last = normalizeEmotionTagged(last, "neutral");
       last = clipTagged(last);
@@ -318,7 +328,10 @@ export async function runConversation(sessionNo) {
         "[SAY]",
         `${speakerTag(owner)} (topic change) emotion=${owner.emotion} temp=${owner.temperature} -> ${last}`
       );
-      await withRetry(() => send(owner.aituberBase, owner.clientId, last), `Send(${speakerTag(owner)})`);
+      await withRetry(
+        () => send(owner.aituberBase, owner.clientId, last),
+        `Send(${speakerTag(owner)})`
+      );
       pushBounded(turnLog, TURN_LOG_MAX, { who: owner.charName, text: last });
       logSay({ sessionNo, turn: i, who: owner.charName, speaker: owner.id, text: last, kind: "topic_change" });
 

@@ -1,4 +1,4 @@
-// エントリーポイント。会話ループ + overlay + YouTube polling を統合。
+// エントリポイント。会話ループ + overlay + YouTube polling を統合。
 
 import { config } from "./config.mjs";
 import { logLine } from "./log.mjs";
@@ -6,9 +6,7 @@ import { sleep } from "./retry.mjs";
 import { startObsOverlayServer } from "./overlay.mjs";
 import { startYouTubeLiveChatPolling, stopYouTubeLiveChatPolling } from "./youtube.mjs";
 import { runConversation } from "./conversation.mjs";
-import { clearRestart, startStallWatch } from "./progress.mjs";
-
-const { streamMode, restartWaitMs, maxRunMs } = config.conversation;
+import { clearRestart, startStallWatch } from "./state.mjs";
 
 function installSignalHandlers() {
   const onSignal = (sig) => {
@@ -30,11 +28,11 @@ async function run() {
     console.warn("[YT] YT_VIDEO_ID is missing. Live comments disabled.");
   }
 
-  if (!streamMode) {
+  if (!config.conversation.streamMode) {
     setTimeout(() => {
       logLine("[STOP]", "タイムアウトで終了");
       process.exit(0);
-    }, maxRunMs);
+    }, config.conversation.maxRunMs);
   }
 
   startStallWatch();
@@ -44,12 +42,12 @@ async function run() {
     clearRestart();
     try {
       await runConversation(sessionNo);
-      process.exit(0); // 通常終了（streamMode=false で TURNS 消化）
+      process.exit(0); // streamMode=false で TURNS 消化したときの通常終了
     } catch (e) {
       logLine("[RESTART]", `#${sessionNo} -> ${e?.message ?? e}`);
     }
     sessionNo++;
-    await sleep(restartWaitMs);
+    await sleep(config.conversation.restartWaitMs);
   }
 }
 

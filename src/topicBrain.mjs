@@ -1,32 +1,26 @@
 // 話題生成。AI による Topic Brain + 固定フォールバック。
 
-import { config, SPEAKER_B } from "./config.mjs";
+import { config } from "./config.mjs";
 import { logLine } from "./log.mjs";
 import { withRetry } from "./retry.mjs";
 import { ollamaChat } from "./ollama.mjs";
 import { oneLine, stripLeadingEmotionTag, isJapanese } from "./text.mjs";
 
-const {
-  enabled: TOPIC_BRAIN_ENABLED,
-  temperature: TOPIC_BRAIN_TEMP,
-  maxChars: TOPIC_BRAIN_MAX_CHARS,
-  lookback: TOPIC_BRAIN_LOOKBACK,
-  repeatAvoid: TOPIC_REPEAT_AVOID,
-  fallbackTopics: TOPICS,
-  changeBy: TOPIC_CHANGE_BY,
-} = config.topicBrain;
-
-export { TOPIC_BRAIN_TEMP };
+export function getTopicBrainTemp() {
+  return config.topicBrain.temperature;
+}
 
 export function pickTopic() {
-  return TOPICS[Math.floor(Math.random() * TOPICS.length)];
+  const list = config.topicBrain.fallbackTopics;
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 export function softClipTopic(s) {
   s = oneLine(s);
   s = s.replace(/^["'「『（(【\[]+/, "").replace(/["'」』）)】\]]+$/, "");
   s = s.replace(/[。！？!?]+$/g, "");
-  if (s.length > TOPIC_BRAIN_MAX_CHARS) s = s.slice(0, TOPIC_BRAIN_MAX_CHARS);
+  const max = config.topicBrain.maxChars;
+  if (s.length > max) s = s.slice(0, max);
   return s;
 }
 
@@ -44,15 +38,17 @@ function isTooSimilarTopic(a, b) {
 
 let _lastTopicBy = "B";
 export function pickTopicOwner() {
-  if (TOPIC_CHANGE_BY.mode === "alternate") {
+  const mode = config.topicBrain.changeBy.mode;
+  if (mode === "alternate") {
     _lastTopicBy = _lastTopicBy === "A" ? "B" : "A";
     return _lastTopicBy;
   }
-  return Math.random() < TOPIC_CHANGE_BY.aWeight ? "A" : "B";
+  return Math.random() < config.topicBrain.changeBy.aWeight ? "A" : "B";
 }
 
 function buildRecentTranscript(turnLog) {
-  const lastN = turnLog.slice(-TOPIC_BRAIN_LOOKBACK);
+  const lookback = config.topicBrain.lookback;
+  const lastN = turnLog.slice(-lookback);
   if (lastN.length === 0) return "";
   return lastN.map((t) => `${t.who}: ${oneLine(stripLeadingEmotionTag(t.text))}`).join("\n");
 }
@@ -66,7 +62,7 @@ async function topicBrain({ speakerForModel, recentTranscript, lastTopic, usedTo
 - 直近の会話と少し関係はあるが、少しだけ意外性（ズラし）を入れる
 - 雑談向き（軽いテーマ）
 - 重い話（政治/事件/暴力/差別/自傷/露骨な性的話題）は避ける
-- 話題は短く（${TOPIC_BRAIN_MAX_CHARS}文字以内が理想）
+- 話題は短く（${config.topicBrain.maxChars}文字以内が理想）
 - 「質問文」ではなく「題材（名詞句）」にする
 - 直前の話題「${lastTopic}」と同じ/ほぼ同じは避ける
 - もし迷ったら、日常・趣味・食・ゲーム・配信・買い物・季節・子どもの頃等から選ぶ
@@ -99,7 +95,8 @@ ${recentTranscript}
     );
   }
 
-  for (let i = Math.max(0, usedTopics.length - TOPIC_REPEAT_AVOID); i < usedTopics.length; i++) {
+  const avoid = config.topicBrain.repeatAvoid;
+  for (let i = Math.max(0, usedTopics.length - avoid); i < usedTopics.length; i++) {
     if (isTooSimilarTopic(raw, usedTopics[i])) return "";
   }
   if (isTooSimilarTopic(raw, lastTopic)) return "";
@@ -109,12 +106,13 @@ ${recentTranscript}
 }
 
 export async function decideNextTopic({ sessionNo, turn, turnLog, lastTopic, usedTopics }) {
-  const brainSpeaker = SPEAKER_B; // モデル同じなのでどちらでも可
+  const temp = config.topicBrain.temperature;
+  const brainSpeaker = config.speakers.B;
 
-  if (!TOPIC_BRAIN_ENABLED) {
+  if (!config.topicBrain.enabled) {
     const t = pickTopic();
     logLine("[TOPIC]", `#${sessionNo} turn=${turn}: "${t}" (FIXED)`);
-    return { topic: t, source: "FIXED", topicTemp: TOPIC_BRAIN_TEMP };
+    return { topic: t, source: "FIXED", topicTemp: temp };
   }
 
   const transcript = buildRecentTranscript(turnLog);
@@ -124,11 +122,11 @@ export async function decideNextTopic({ sessionNo, turn, turnLog, lastTopic, use
       recentTranscript: transcript,
       lastTopic,
       usedTopics,
-      temperature: TOPIC_BRAIN_TEMP,
+      temperature: temp,
     });
     if (t) {
-      logLine("[TOPIC]", `#${sessionNo} turn=${turn}: "${t}" (BRAIN temp=${TOPIC_BRAIN_TEMP})`);
-      return { topic: t, source: "BRAIN", topicTemp: TOPIC_BRAIN_TEMP };
+      logLine("[TOPIC]", `#${sessionNo} turn=${turn}: "${t}" (BRAIN temp=${temp})`);
+      return { topic: t, source: "BRAIN", topicTemp: temp };
     }
   } catch (e) {
     logLine("[WARN]", `TopicBrain error -> fallback: ${e?.message ?? e}`);
@@ -136,5 +134,5 @@ export async function decideNextTopic({ sessionNo, turn, turnLog, lastTopic, use
 
   const fb = pickTopic();
   logLine("[TOPIC]", `#${sessionNo} turn=${turn}: "${fb}" (FALLBACK)`);
-  return { topic: fb, source: "FALLBACK", topicTemp: TOPIC_BRAIN_TEMP };
+  return { topic: fb, source: "FALLBACK", topicTemp: temp };
 }

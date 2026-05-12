@@ -1,8 +1,12 @@
-// ログ出力ユーティリティ。コンソール + JSONL。
+// ログ出力ユーティリティ。コンソール + JSONL + イベント emitter (SSE 用)。
 
 import fs from "node:fs";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { config } from "./config.mjs";
+
+export const logEmitter = new EventEmitter();
+logEmitter.setMaxListeners(100);
 
 function nowStr() {
   const d = new Date();
@@ -13,7 +17,9 @@ function nowStr() {
 }
 
 export function logLine(tag, msg) {
-  console.log(`[${nowStr()}] ${tag} ${msg}`);
+  const line = `[${nowStr()}] ${tag} ${msg}`;
+  console.log(line);
+  logEmitter.emit("line", { ts: Date.now(), tag, msg });
 }
 
 function jsonlPath(name) {
@@ -29,13 +35,12 @@ function appendJsonl(filePath, obj) {
   }
 }
 
-const SAY_PATH = jsonlPath(config.log.sayJsonl);
-const EVENTS_PATH = jsonlPath(config.log.eventsJsonl);
-
 export function logSay(entry) {
-  appendJsonl(SAY_PATH, { kind: "say", ...entry });
+  appendJsonl(jsonlPath(config.log.sayJsonl), { kind: "say", ...entry });
+  logEmitter.emit("say", entry);
 }
 
 export function logEvent(entry) {
-  appendJsonl(EVENTS_PATH, { kind: "event", ...entry });
+  appendJsonl(jsonlPath(config.log.eventsJsonl), { kind: "event", ...entry });
+  logEmitter.emit("event", entry);
 }

@@ -3,8 +3,6 @@
 import { config } from "./config.mjs";
 import { fetchWithTimeout } from "./retry.mjs";
 
-const { fetchTimeoutMs } = config.ollama;
-
 export async function send(base, clientId, text) {
   const res = await fetchWithTimeout(
     `${base}/api/messages/?clientId=${clientId}&type=direct_send`,
@@ -13,7 +11,7 @@ export async function send(base, clientId, text) {
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ messages: [text] }),
     },
-    fetchTimeoutMs
+    config.ollama.fetchTimeoutMs
   );
 
   if (!res.ok) {

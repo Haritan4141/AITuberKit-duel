@@ -1,19 +1,10 @@
 // YouTube Live Chat polling とコメントキュー
 
 import { config } from "./config.mjs";
-import { logLine } from "./log.mjs";
-import { sleep, fetchWithTimeout } from "./retry.mjs";
+import { fetchWithTimeout } from "./retry.mjs";
 import { sanitizeChatText } from "./text.mjs";
 
 const YT_API_BASE = "https://www.googleapis.com/youtube/v3";
-const {
-  apiKey: YT_API_KEY,
-  debug: YT_DEBUG,
-  commentInsertRate: COMMENT_INSERT_RATE,
-  commentQueueMax: COMMENT_QUEUE_MAX,
-  pollIntervalMs: YT_POLL_INTERVAL_MS,
-  seenIdsMax: SEEN_IDS_MAX,
-} = config.youtube;
 
 const liveCommentQueue = [];
 const seenCommentIds = new Set();
@@ -26,7 +17,7 @@ async function ytGetActiveLiveChatId(videoId) {
   const url = new URL(`${YT_API_BASE}/videos`);
   url.searchParams.set("part", "liveStreamingDetails");
   url.searchParams.set("id", videoId);
-  url.searchParams.set("key", YT_API_KEY);
+  url.searchParams.set("key", config.youtube.apiKey);
 
   const res = await fetchWithTimeout(url, { signal: abortController.signal }, 15000);
   if (!res.ok) {
@@ -42,7 +33,7 @@ async function ytListLiveChatMessages(liveChatId, pageToken) {
   url.searchParams.set("liveChatId", liveChatId);
   url.searchParams.set("part", "snippet,authorDetails");
   url.searchParams.set("maxResults", "200");
-  url.searchParams.set("key", YT_API_KEY);
+  url.searchParams.set("key", config.youtube.apiKey);
   if (pageToken) url.searchParams.set("pageToken", pageToken);
 
   const res = await fetchWithTimeout(url, { signal: abortController.signal }, 15000);
@@ -54,9 +45,9 @@ async function ytListLiveChatMessages(liveChatId, pageToken) {
 }
 
 function trimSeenSet() {
-  // SEEN_IDS_MAX を超えたら古い順に間引く（FIFO）
-  if (seenCommentIds.size <= SEEN_IDS_MAX) return;
-  const drop = seenCommentIds.size - SEEN_IDS_MAX;
+  const max = config.youtube.seenIdsMax;
+  if (seenCommentIds.size <= max) return;
+  const drop = seenCommentIds.size - max;
   const iter = seenCommentIds.values();
   for (let i = 0; i < drop; i++) {
     const v = iter.next().value;
@@ -65,7 +56,6 @@ function trimSeenSet() {
   }
 }
 
-// abortController.signal が立ったら早めに抜ける sleep
 async function abortableSleep(ms) {
   if (aborted()) return;
   await new Promise((resolve) => {
@@ -82,8 +72,10 @@ async function abortableSleep(ms) {
 }
 
 export async function startYouTubeLiveChatPolling(videoId) {
-  console.log("[YT] key loaded:", !!YT_API_KEY, "len=", (YT_API_KEY || "").length);
-  if (!YT_API_KEY) {
+  const apiKey = config.youtube.apiKey;
+  const debug = config.youtube.debug;
+  console.log("[YT] key loaded:", !!apiKey, "len=", (apiKey || "").length);
+  if (!apiKey) {
     console.warn("[YT] YT_API_KEY is missing. Live comments disabled.");
     return;
   }
@@ -92,7 +84,7 @@ export async function startYouTubeLiveChatPolling(videoId) {
     return;
   }
 
-  if (YT_DEBUG) console.log("[YT] polling start. videoId:", videoId);
+  if (debug) console.log("[YT] polling start. videoId:", videoId);
 
   let liveChatId;
   try {
@@ -108,13 +100,12 @@ export async function startYouTubeLiveChatPolling(videoId) {
 
   console.log("[YT] liveChatId:", liveChatId);
 
-  // ウォームアップ：過去ログは捨て「今」から拾う
   let nextPageToken = null;
   try {
     const warm = await ytListLiveChatMessages(liveChatId, null);
     nextPageToken = warm?.nextPageToken || null;
     const warmWaitMs = Math.max(1000, Number(warm?.pollingIntervalMillis || 5000));
-    if (YT_DEBUG) {
+    if (debug) {
       const n = Array.isArray(warm?.items) ? warm.items.length : 0;
       console.log(`[YT] warmup: skipped items=${n} tokenReady=${!!nextPageToken} wait=${warmWaitMs}ms`);
     }
@@ -138,9 +129,9 @@ export async function startYouTubeLiveChatPolling(videoId) {
     nextPageToken = data?.nextPageToken || nextPageToken;
     const items = Array.isArray(data?.items) ? data.items : [];
 
-    if (YT_DEBUG) {
+    if (debug) {
       console.log(
-        `[YT] polled: items=${items.length} queue=${liveCommentQueue.length} wait=${YT_POLL_INTERVAL_MS}ms tokenChanged=${prevToken !== nextPageToken}`
+        `[YT] polled: items=${items.length} queue=${liveCommentQueue.length} wait=${config.youtube.pollIntervalMs}ms tokenChanged=${prevToken !== nextPageToken}`
       );
     }
 
@@ -154,22 +145,22 @@ export async function startYouTubeLiveChatPolling(videoId) {
       if (!text) continue;
 
       liveCommentQueue.push(text);
-      if (liveCommentQueue.length > COMMENT_QUEUE_MAX) liveCommentQueue.shift();
+      if (liveCommentQueue.length > config.youtube.commentQueueMax) liveCommentQueue.shift();
       added++;
 
-      if (YT_DEBUG && added === 1) {
+      if (debug && added === 1) {
         const author = it?.authorDetails?.displayName || "unknown";
         console.log(`[YT] new: ${author}: ${text}`);
       }
     }
 
-    if (YT_DEBUG) console.log(`[YT] added=${added} queue=${liveCommentQueue.length}`);
+    if (debug) console.log(`[YT] added=${added} queue=${liveCommentQueue.length}`);
 
     trimSeenSet();
-    await abortableSleep(YT_POLL_INTERVAL_MS);
+    await abortableSleep(config.youtube.pollIntervalMs);
   }
 
-  if (YT_DEBUG) console.log("[YT] polling stopped.");
+  if (debug) console.log("[YT] polling stopped.");
 }
 
 export function stopYouTubeLiveChatPolling() {
@@ -187,4 +178,6 @@ export function popLiveCommentDedup() {
   return null;
 }
 
-export const COMMENT_INSERT_RATE_VALUE = COMMENT_INSERT_RATE;
+export function getLiveCommentQueueLength() {
+  return liveCommentQueue.length;
+}
