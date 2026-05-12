@@ -3,7 +3,7 @@
 import { config } from "./config.mjs";
 import { logLine } from "./log.mjs";
 import { sleep } from "./retry.mjs";
-import { startObsOverlayServer } from "./overlay.mjs";
+import { startServer } from "./server.mjs";
 import { startYouTubeLiveChatPolling, stopYouTubeLiveChatPolling } from "./youtube.mjs";
 import { runConversation } from "./conversation.mjs";
 import { clearRestart, startStallWatch } from "./state.mjs";
@@ -20,7 +20,7 @@ function installSignalHandlers() {
 
 async function run() {
   installSignalHandlers();
-  startObsOverlayServer();
+  startServer();
 
   if (config.youtube.videoId) {
     startYouTubeLiveChatPolling(config.youtube.videoId);
