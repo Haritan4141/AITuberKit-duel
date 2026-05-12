@@ -8,10 +8,12 @@ import { getOverlayState } from "./overlay.mjs";
 import {
   getState,
   isPaused,
+  isRunning,
   pause,
   requestRestart,
   requestTopicSkip,
   resume,
+  setRunning,
 } from "./state.mjs";
 import { getLiveCommentQueueLength } from "./youtube.mjs";
 
@@ -70,6 +72,7 @@ function handleStatus(req, res) {
     source: overlay.source,
     topicTemp: overlay.topicTemp,
     overlayUpdatedAt: overlay.updatedAt,
+    running: state.running,
     paused: state.paused,
     restartRequested: state.restartRequested,
     topicSkipRequested: state.topicSkipRequested,
@@ -147,6 +150,21 @@ function handleResume(req, res) {
 }
 
 // =================================================
+// /api/start /api/stop  (会話ループの開始/停止。HTTP サーバーは生かしたまま)
+// =================================================
+function handleStart(req, res) {
+  setRunning(true);
+  logLine("[ADMIN]", "conversation started");
+  sendJson(res, 200, { ok: true, running: true });
+}
+
+function handleStop(req, res) {
+  setRunning(false);
+  logLine("[ADMIN]", "conversation stopped (current turn will finish first)");
+  sendJson(res, 200, { ok: true, running: false });
+}
+
+// =================================================
 // /api/log/stream  (SSE)
 // =================================================
 function handleLogStream(req, res) {
@@ -203,6 +221,8 @@ export async function handleApi(req, res, url) {
     case "POST /api/skip-topic": return handleSkipTopic(req, res);
     case "POST /api/pause":      return handlePause(req, res);
     case "POST /api/resume":     return handleResume(req, res);
+    case "POST /api/start":      return handleStart(req, res);
+    case "POST /api/stop":       return handleStop(req, res);
     case "GET /api/log/stream":  return handleLogStream(req, res);
   }
 

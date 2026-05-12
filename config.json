@@ -27,6 +27,7 @@
   },
   "conversation": {
     "streamMode": true,
+    "autoStart": false,
     "turns": 20,
     "maxChars": 220,
     "callNameProb": 0.2,

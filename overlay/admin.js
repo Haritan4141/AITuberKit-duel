@@ -15,6 +15,8 @@ const els = {
   topic: $("topic"),
   source: $("source"),
 
+  btnStart: $("btnStart"),
+  btnStop: $("btnStop"),
   btnSkip: $("btnSkip"),
   btnPause: $("btnPause"),
   btnResume: $("btnResume"),
@@ -57,8 +59,10 @@ function setStatePill(cls, label) {
 }
 
 function applyStatus(s) {
-  // 状態 pill
-  if (s.restartRequested || restartCountdown > 0) {
+  // 状態 pill: idle / running / paused / restarting
+  if (!s.running) {
+    setStatePill("idle", "idle");
+  } else if (s.restartRequested || restartCountdown > 0) {
     setStatePill("restarting", "restarting");
     restartCountdown = Math.max(0, restartCountdown - 1);
   } else if (s.paused) {
@@ -76,8 +80,11 @@ function applyStatus(s) {
   els.source.textContent = s.source ? `(${s.source})` : "";
 
   // ボタンの有効/無効
-  els.btnPause.disabled = !!s.paused;
-  els.btnResume.disabled = !s.paused;
+  els.btnStart.disabled = !!s.running;
+  els.btnStop.disabled = !s.running;
+  els.btnSkip.disabled = !s.running;
+  els.btnPause.disabled = !s.running || !!s.paused;
+  els.btnResume.disabled = !s.running || !s.paused;
 
   lastStatus = s;
 }
@@ -103,6 +110,14 @@ function flashMsg(el, text, cls = "") {
   setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, 4000);
 }
 
+els.btnStart.addEventListener("click", async () => {
+  try { await call("/api/start"); flashMsg(els.ctrlMsg, "started"); }
+  catch (e) { flashMsg(els.ctrlMsg, e.message, "err"); }
+});
+els.btnStop.addEventListener("click", async () => {
+  try { await call("/api/stop"); flashMsg(els.ctrlMsg, "stopped (current turn will finish first)"); }
+  catch (e) { flashMsg(els.ctrlMsg, e.message, "err"); }
+});
 els.btnSkip.addEventListener("click", async () => {
   try { await call("/api/skip-topic"); flashMsg(els.ctrlMsg, "skip requested"); }
   catch (e) { flashMsg(els.ctrlMsg, e.message, "err"); }

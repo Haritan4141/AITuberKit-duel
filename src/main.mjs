@@ -1,4 +1,5 @@
-// エントリポイント。会話ループ + overlay + YouTube polling を統合。
+// エントリポイント。
+// HTTP サーバー + YT polling は常時起動、会話ループは isRunning() に従って待機/起動する。
 
 import { config } from "./config.mjs";
 import { logLine } from "./log.mjs";
@@ -6,7 +7,12 @@ import { sleep } from "./retry.mjs";
 import { startServer } from "./server.mjs";
 import { startYouTubeLiveChatPolling, stopYouTubeLiveChatPolling } from "./youtube.mjs";
 import { runConversation } from "./conversation.mjs";
-import { clearRestart, startStallWatch } from "./state.mjs";
+import {
+  clearRestart,
+  setRunning,
+  startStallWatch,
+  waitUntilRunning,
+} from "./state.mjs";
 
 function installSignalHandlers() {
   const onSignal = (sig) => {
@@ -37,12 +43,22 @@ async function run() {
 
   startStallWatch();
 
+  if (config.conversation.autoStart) {
+    logLine("[STATE]", "autoStart=true: starting conversation immediately");
+    setRunning(true);
+  } else {
+    logLine("[STATE]", "idle (waiting for /api/start from admin UI)");
+  }
+
   let sessionNo = 1;
   while (true) {
+    // running になるまで待機（GUI の Start ボタン or autoStart=true）
+    await waitUntilRunning();
     clearRestart();
     try {
       await runConversation(sessionNo);
-      process.exit(0); // streamMode=false で TURNS 消化したときの通常終了
+      // streamMode=false で TURNS 消化 → 通常終了
+      if (!config.conversation.streamMode) process.exit(0);
     } catch (e) {
       logLine("[RESTART]", `#${sessionNo} -> ${e?.message ?? e}`);
     }

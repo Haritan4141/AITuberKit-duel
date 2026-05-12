@@ -31,29 +31,34 @@ ollama pull gemma3:12b
 ```
 
 ## 起動手順
-1) AITuberKit (A/B) + Ollama を起動
+1) すべて起動（A/B + Ollama + duel + Admin UI）
 ```bat
 start_aituber.bat
 ```
+このバッチで以下が立ち上がります:
+- Ollama
+- AITuberKit A (http://localhost:3000)
+- AITuberKit B (http://localhost:3001)
+- duel.mjs（**idle 待機状態**で起動。会話はまだ始まりません）
+- Admin UI (http://127.0.0.1:8787/admin) が自動でブラウザで開く
 
-2) AITuberKit(ブラウザ)の設定
-http://localhost:3000/
-http://localhost:3001/
-それぞれで
-左上歯車から その他 外部からの指示を受け付ける の状態をONにする
-Client ID をそれぞれ 「speakerA」 と 「speakerB」 に設定する
-VRM ファイルや背景は **各ポートごと** にブラウザ側の設定で切り替えてください。
-ポート違い（3000 / 3001）は別オリジン扱いなので、localStorage は独立して保持されます。
+2) AITuberKit(ブラウザ)の設定（初回のみ）
+http://localhost:3000/ と http://localhost:3001/ それぞれで
+左上歯車から その他 外部からの指示を受け付ける の状態を **ON**
+Client ID をそれぞれ「speakerA」「speakerB」に設定
+VRM / 背景は各ポートで個別に設定（localStorage がポート別オリジンで独立保持）。
 同梱 VRM: `aituber-kit/public/vrm/` （`Mafuyu_VRM.vrm` / `MANUKA.vrm`）
 
-3) VOICEBOXの起動
-VOICEBOXを起動してください
-※読み上げが不要の場合はスキップ
+3) VOICEBOX の起動（読み上げ不要ならスキップ）
 
-4) デュエルを開始
-```bat
-start_duel.bat
-```
+4) Admin UI から会話を開始
+http://127.0.0.1:8787/admin で **「▶ Start」** ボタンを押すと会話開始。
+- 「■ Stop」で会話だけ停止（サーバーは生きたまま）
+- 「↪ Skip Topic」「⏸ Pause / ▶ Resume」で会話制御
+- 左側の textarea で config.json を編集して「Save & Restart」で設定反映
+
+※ `config.json` の `"conversation": { "autoStart": true }` にすると duel 起動と同時に会話が始まります。
+※ duel 単体起動（ターミナルからログを直接見たい場合）は従来通り `start_duel.bat`
 
 ## 30分ごとの自動再起動 (任意)
 ```bat
@@ -76,6 +81,6 @@ OBS の「ブラウザ」ソースに以下を追加してください。
 - http://127.0.0.1:8787/overlay
 
 ## 停止
-- AITuberKit / Ollama を止める: `stop_aituber.bat`
-- デュエル単体は `start_duel.bat` のウィンドウを閉じる or `Ctrl+C`
+- すべて止める: `stop_aituber.bat`（AITuberKit A/B + Ollama + duel.mjs を一括停止）
+- 会話だけ止めて GUI / OBS overlay は維持したい場合は Admin UI の「■ Stop」
 

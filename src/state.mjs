@@ -15,6 +15,7 @@ const state = {
   restartRequested: false,
   paused: false,
   topicSkipRequested: false,
+  running: false, // 会話ループが起動しているか (idle / running の切り替え)
 };
 
 export const stateEmitter = new EventEmitter();
@@ -82,14 +83,39 @@ export function consumeTopicSkip() {
   return true;
 }
 
+export function setRunning(v) {
+  if (state.running === v) return;
+  state.running = v;
+  if (v) markProgress();
+  logLine("[STATE]", v ? "started" : "stopped");
+  stateEmitter.emit("change", { key: "running", value: v });
+}
+
+export function isRunning() {
+  return state.running;
+}
+
+export async function waitUntilRunning() {
+  if (state.running) return;
+  await new Promise((resolve) => {
+    const onChange = (ev) => {
+      if (ev.key === "running" && ev.value === true) {
+        stateEmitter.off("change", onChange);
+        resolve();
+      }
+    };
+    stateEmitter.on("change", onChange);
+  });
+}
+
 export function getState() {
   return { ...state };
 }
 
 export function startStallWatch() {
   const t = setInterval(() => {
-    if (state.paused) {
-      // pause 中は stall 判定を凍結
+    // idle / pause 中は stall 判定を凍結
+    if (!state.running || state.paused) {
       state.lastProgressMs = Date.now();
       return;
     }

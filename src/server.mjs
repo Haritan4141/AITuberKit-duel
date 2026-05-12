@@ -93,7 +93,10 @@ export function startServer() {
     logLine("[OBS]", `Topic overlay: http://127.0.0.1:${config.overlay.port}/overlay`);
     logLine("[ADMIN]", `Admin UI:      http://127.0.0.1:${config.overlay.port}/admin`);
   });
-  server.unref?.();
+  // 注: ここで server.unref() しない。
+  // idle 待機モード (waitUntilRunning の Promise) では server が唯一の event loop handle
+  // になることがあり、unref すると Node.js が早期 exit してしまう。
+  // SIGINT/SIGTERM ハンドラで明示的に process.exit(0) しているので、終了制御は問題ない。
 
   return server;
 }

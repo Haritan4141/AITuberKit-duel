@@ -32,9 +32,10 @@ aituber-kit/        … AITuberKit 本体（A/B 共通。PORT で 2 プロセス
 ```
 
 ## 実行フロー
-1) `start_aituber.bat` で A (PORT=3000) / B (PORT=3001) / Ollama を起動
-2) ブラウザで http://localhost:3000 と http://localhost:3001 を開き、各ポートで VRM / 背景 / Client ID を設定
-3) `start_duel.bat` で `duel.mjs` を起動
+1) `start_aituber.bat` で A (3000) / B (3001) / Ollama / **duel.mjs (idle 起動)** を起動。最後に Admin UI (`:8787/admin`) が自動でブラウザで開く。
+2) ブラウザで http://localhost:3000 と http://localhost:3001 を開き、各ポートで VRM / 背景 / Client ID を設定（初回のみ）
+3) Admin UI で **「▶ Start」** ボタンを押すと会話開始（`config.conversation.autoStart=true` なら手順 3 は不要）
+4) duel 単体起動（ログを同じ窓で見たいとき）は `start_duel.bat` を使う
 
 ## 設定の触り方
 - 性格・温度・モデル → `config.json` > `speakers.A` / `speakers.B`
@@ -59,6 +60,8 @@ aituber-kit/        … AITuberKit 本体（A/B 共通。PORT で 2 プロセス
 | GET  | /api/status      | 現在の sessionNo / turn / topic / paused / idleSec / queueLen |
 | GET  | /api/config      | disk の config.json を返す（secrets 含まず） |
 | POST | /api/config      | 設定を保存 (`.bak` 自動作成) + reload + 会話再起動 |
+| POST | /api/start       | 会話ループを開始 (idle → running) |
+| POST | /api/stop        | 会話ループを停止 (running → idle) ※ 進行中ターンは完了する |
 | POST | /api/skip-topic  | 次ターンで話題切替を強制 |
 | POST | /api/pause       | 一時停止 |
 | POST | /api/resume      | 再開 |

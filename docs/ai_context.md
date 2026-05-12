@@ -4,7 +4,7 @@
 > プロジェクトの現在地・判断履歴・未完了事項をここに集約し、セッション間で情報が失われないようにします。
 > **重要な進捗があったら必ずこのファイルを更新してください**（運用ルール参照）。
 
-最終更新: 2026-05-12（GUI 化第一弾を完了）
+最終更新: 2026-05-12（idle 待機モード + GUI Start/Stop ボタン追加）
 
 ---
 
@@ -64,15 +64,16 @@ AITuberKit/
 ```
 
 ### 起動方法（人間向け手順）
-1. `start_aituber.bat` … Ollama + AITuberKit A (port 3000) + B (port 3001) を別ウィンドウで起動
-2. ブラウザで http://localhost:3000 と http://localhost:3001 を開き、各ポートで:
+1. `start_aituber.bat` 一発で Ollama + AITuberKit A (3000) + B (3001) + **duel.mjs (idle 起動)** が立ち上がり、Admin UI (`:8787/admin`) が自動でブラウザで開く
+2. ブラウザで http://localhost:3000 / :3001 を開いて各ポートで設定（初回のみ）:
    - 歯車 → その他 → 「外部からの指示を受け付ける」を ON
    - Client ID を「speakerA」「speakerB」にそれぞれ設定
-   - VRM / 背景はブラウザ側で設定（localStorage はポート違い = 別オリジンで独立保持）
+   - VRM / 背景はブラウザ側で設定
 3. (任意) VOICEVOX を起動
-4. `start_duel.bat`（テスト/短時間）or `start_duel_watchdog.bat`（長時間配信）で会話開始
-5. 停止は `stop_aituber.bat`
-6. 管理 UI: ブラウザで `http://127.0.0.1:8787/admin` を開く（設定編集 / pause / resume / skip-topic / ライブログ）
+4. Admin UI で **「▶ Start」** ボタンを押すと会話開始
+5. 停止は Admin UI の「■ Stop」（会話だけ）or `stop_aituber.bat`（全部）
+6. `start_duel.bat` は duel 単体起動用に残存（ログを同じ窓で見たい人向け）
+7. `config.conversation.autoStart = true` にすれば duel 起動と同時に会話が始まる（手順 4 不要）
 
 ### ビルド / テスト
 - duel 側は build なし（Node.js + ES Modules で直接起動）。構文確認は `node --check src/*.mjs`。
@@ -98,7 +99,11 @@ AITuberKit/
 ### コミット履歴（新しい順）
 | commit | 内容 |
 |---|---|
-| (latest) | 管理 UI フロント (overlay/admin.*) を追加 + secrets / paths を disk から除外 |
+| (latest) | duel に idle 待機モード追加 (state.running) + GUI Start/Stop ボタン + start_aituber.bat で duel も立てる + server.unref() 削除 (idle 待機時の早期 exit 回避) |
+| `3a02e77` | start_aituber.bat 起動後に /admin をブラウザで自動オープン（旧、後で書き換え） |
+| `10e9d30` | stop_aituber.bat に duel.mjs (port 8787) の停止を追加 |
+| `89d4900` | docs/ai_context.md と AGENTS.md を GUI 化第一弾の完了状態に更新 |
+| `6cdcce7` | 管理 UI フロント (overlay/admin.*) を追加 + secrets / paths を disk から除外 |
 | `d94d03e` | HTTP サーバー統合 + 管理用 API + 会話ループとの結線 (src/server.mjs / src/admin.mjs 新設) |
 | `ac5722e` | config を mutable 化し reloadConfig() を実装。state.mjs に runtime 状態を集約 |
 | `c5fa5d2` | docs/ai_context.md を追加: AI エージェント引き継ぎ用コンテキスト |
@@ -116,6 +121,7 @@ AITuberKit/
 5. **VRM 切替はブラウザ側 localStorage で**: ポート別 origin で独立保存される。同梱 VRM は `aituber-kit/public/vrm/` 1 箇所に集約。
 6. **GUI 反映方式は「会話セッション再起動」**: hot-reload ではなく、`requestRestart()` で `runConversation` を throw → 外側ループが新セッションを開始。プロセス再起動なしで watchdog 不要、state 整合性も担保。
 7. **secrets は disk に書かない**: `youtube.apiKey` は `.env` から実行時注入。`writeConfigToDisk` で `stripSecretsAndDerived` を必ず通し、`apiKey` と `paths` を除外（過去に POST 経由で disk に漏れたケースあり、コミット前に修復済み）。
+8. **duel.mjs は idle 待機モードを既定**: 起動時は HTTP サーバー + YT polling だけ動かし、会話ループは `setRunning(true)` まで待機（`config.conversation.autoStart=true` で従来挙動）。これにより `start_aituber.bat` 一発で「Admin UI が開けるが会話はまだ始まっていない」状態を実現。`server.unref()` を使うと idle 待機中に Node.js が早期 exit するため呼ばない（SIGINT/SIGTERM の `process.exit(0)` で終了制御）。
 
 ### 解消済みのレビュー指摘
 - SIGINT 二重登録（旧 duel.mjs L434 と L1269）→ `src/main.mjs` で 1 回のみ登録
@@ -137,16 +143,18 @@ AITuberKit/
 
 ## 未完了タスク
 
-### GUI 化 第一弾は完了
+### GUI 化 第二弾まで完了
 | 項目 | 状態 |
 |---|---|
-| `GET /api/status` | ✅ 動作確認済 |
+| `GET /api/status` (running 含む) | ✅ 動作確認済 |
 | `GET /api/config` (disk 生 JSON) | ✅ 動作確認済 |
 | `POST /api/config` (validation + bak + reload + restart) | ✅ 動作確認済 |
+| `POST /api/start` / `POST /api/stop` (idle/running 切替) | ✅ 動作確認済 |
 | `POST /api/skip-topic` | ✅ 動作確認済 |
 | `POST /api/pause` / `POST /api/resume` | ✅ 動作確認済 |
 | `GET /api/log/stream` (SSE) | ✅ 実装済 (実 LLM での連続動作は未検証) |
-| `/admin` 画面 | ✅ 動作確認済 (curl で HTML/CSS/JS 配信を確認) |
+| `/admin` 画面 (Start/Stop/Skip/Pause/Resume/Restart) | ✅ curl で HTML/CSS/JS 配信を確認、Start/Stop の API は疎通確認済 |
+| `start_aituber.bat` 一発で全部起動 + admin 自動オープン | ✅ 実装済 (ユーザー側で動作確認待ち) |
 
 ### 次フェーズ候補（未着手）
 - [ ] 設定の項目別フォーム化（speaker 温度や TopicBrain 関連の頻出項目を専用 UI に）
@@ -314,3 +322,4 @@ file start_aituber.bat
 |---|---|---|
 | 2026-05-12 | Claude Opus 4.7 | 初版作成。A/B 統合 / duel.mjs 分割 / overlay 最適化 / 運用スクリプト改善 / bat 改行修正 までの履歴を集約。GUI 化を次フェーズとして設定。 |
 | 2026-05-12 | Claude Opus 4.7 | GUI 化第一弾を完了: config の mutable 化 + reloadConfig、state.mjs 新設、HTTP サーバー統合 (server.mjs)、API ハンドラ (admin.mjs)、管理 UI フロント (overlay/admin.*)。`writeConfigToDisk` から secrets / paths を除外する `stripSecretsAndDerived` を追加。動作確認状況と次フェーズ候補を更新。 |
+| 2026-05-12 | Claude Opus 4.7 | idle 待機モード追加。`state.running` を新設し `main.mjs` を「running になるまで待機 → ループ」に変更。`POST /api/start` / `POST /api/stop` を新設し、GUI に Start/Stop ボタンを追加。`config.conversation.autoStart` (デフォルト false)。`start_aituber.bat` で A/B + Ollama + duel (idle) + ブラウザ自動オープンまで実行する形に統合。idle 待機時の Node.js 早期 exit を防ぐため `server.unref()` を撤去。 |

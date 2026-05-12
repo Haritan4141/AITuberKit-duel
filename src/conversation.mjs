@@ -28,6 +28,7 @@ import {
   consumeTopicSkip,
   isPaused,
   isRestartRequested,
+  isRunning,
   markProgress,
   waitWhilePaused,
 } from "./state.mjs";
@@ -255,6 +256,7 @@ export async function runConversation(sessionNo) {
   await sleep(estimateSpeakMs(last));
 
   for (let i = 1; i <= TURNS; i++) {
+    if (!isRunning()) throw new Error("STOPPED");
     if (isPaused()) await waitWhilePaused();
     softResetHistory(histA);
     softResetHistory(histB);
