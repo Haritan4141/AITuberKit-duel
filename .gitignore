@@ -15,3 +15,7 @@ duel_events.jsonl
 
 # config.json のバックアップ（admin 保存時に作成される）
 config.json.bak
+
+# VRM ファイル（GitHub の 100MB 制限を超えるため、リポジトリには含めない。
+#  ユーザー各自で aituber-kit/public/vrm/ に配置する想定）
+*.vrm
